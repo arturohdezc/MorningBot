@@ -15,11 +15,21 @@ def run_oauth_server():
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(oauth_app, host="0.0.0.0", port=port, log_level="info")
 
-def run_telegram_bot():
+async def run_telegram_bot():
     """Run Telegram bot"""
-    # Import here to avoid circular imports
-    import bot
-    # The bot.py should have its main execution logic
+    try:
+        # Import here to avoid circular imports
+        from bot import main as bot_main
+        print("🤖 Bot imported successfully")
+        
+        # Run the bot's main function
+        await bot_main()
+        
+    except Exception as e:
+        print(f"❌ Error starting Telegram bot: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 async def main():
     """Main function to coordinate both services"""
@@ -33,7 +43,7 @@ async def main():
     print("🤖 Starting Telegram bot...")
     
     # Start Telegram bot (this will block)
-    run_telegram_bot()
+    await run_telegram_bot()
 
 if __name__ == "__main__":
     asyncio.run(main())

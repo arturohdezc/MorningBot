@@ -767,39 +767,70 @@ async def handle_inline_button(update: Update, context: ContextTypes.DEFAULT_TYP
     elif query.data == "ai_config_back":
         await show_ai_config_menu(update, context, edit=True)
 
-def main() -> None:
+async def main() -> None:
     """Start the bot."""
-    # Get bot token
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        logger.error("TELEGRAM_BOT_TOKEN not found in environment variables")
-        return
-    
-    # Create the Application
-    application = Application.builder().token(token).build()
-    
-    # Add command handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("tasks", cmd_tasks))
-    application.add_handler(CommandHandler("add", cmd_add))
-    application.add_handler(CommandHandler("recur", cmd_recur))
-    application.add_handler(CommandHandler("done", cmd_done))
-    application.add_handler(CommandHandler("ia", cmd_ia))
-    
-    # Placeholder handlers for existing commands
-    application.add_handler(CommandHandler("brief", cmd_brief))
-    application.add_handler(CommandHandler("prefs", cmd_prefs))
-    application.add_handler(CommandHandler("ajusta", cmd_ajusta))
-    application.add_handler(CommandHandler("aiinfo", cmd_aiinfo))
-    application.add_handler(CommandHandler("aiconfig", show_ai_config_menu))
-    
-    # Button handlers
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_button_message))
-    application.add_handler(CallbackQueryHandler(handle_inline_button))
-    
-    # Run the bot until the user presses Ctrl-C
-    logger.info("Starting bot...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    try:
+        # Get bot token
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if not token:
+            logger.error("TELEGRAM_BOT_TOKEN not found in environment variables")
+            raise ValueError("TELEGRAM_BOT_TOKEN not found")
+        
+        logger.info("🤖 Initializing Telegram bot...")
+        
+        # Create the Application
+        application = Application.builder().token(token).build()
+        
+        # Add command handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("tasks", cmd_tasks))
+        application.add_handler(CommandHandler("add", cmd_add))
+        application.add_handler(CommandHandler("recur", cmd_recur))
+        application.add_handler(CommandHandler("done", cmd_done))
+        application.add_handler(CommandHandler("ia", cmd_ia))
+        
+        # Placeholder handlers for existing commands
+        application.add_handler(CommandHandler("brief", cmd_brief))
+        application.add_handler(CommandHandler("prefs", cmd_prefs))
+        application.add_handler(CommandHandler("ajusta", cmd_ajusta))
+        application.add_handler(CommandHandler("aiinfo", cmd_aiinfo))
+        application.add_handler(CommandHandler("aiconfig", show_ai_config_menu))
+        
+        # Button handlers
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_button_message))
+        application.add_handler(CallbackQueryHandler(handle_inline_button))
+        
+        # Initialize and start the bot
+        await application.initialize()
+        await application.start()
+        
+        logger.info("✅ Telegram bot started successfully!")
+        
+        # Start polling
+        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+        
+        # Keep running
+        import signal
+        stop_signals = (signal.SIGTERM, signal.SIGINT)
+        for sig in stop_signals:
+            signal.signal(sig, lambda s, f: asyncio.create_task(shutdown(application)))
+        
+        # Run forever
+        while True:
+            await asyncio.sleep(1)
+            
+    except Exception as e:
+        logger.error(f"❌ Error in bot main: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+async def shutdown(application):
+    """Graceful shutdown"""
+    logger.info("🛑 Shutting down bot...")
+    await application.updater.stop()
+    await application.stop()
+    await application.shutdown()
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
