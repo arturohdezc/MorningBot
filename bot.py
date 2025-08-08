@@ -778,6 +778,28 @@ async def main() -> None:
         
         logger.info("🤖 Initializing Telegram bot...")
         
+        # Check for existing instance lock
+        lock_file = "/tmp/telegram_bot.lock"
+        if os.path.exists(lock_file):
+            logger.warning("⚠️ Lock file exists - checking if another instance is running")
+            try:
+                with open(lock_file, 'r') as f:
+                    old_pid = f.read().strip()
+                logger.info(f"🔍 Found old PID: {old_pid}")
+                # Remove stale lock file
+                os.remove(lock_file)
+                logger.info("🧹 Removed stale lock file")
+            except:
+                pass
+        
+        # Create new lock file
+        try:
+            with open(lock_file, 'w') as f:
+                f.write(str(os.getpid()))
+            logger.info(f"🔒 Created lock file with PID: {os.getpid()}")
+        except:
+            logger.warning("⚠️ Could not create lock file")
+        
         # Create the Application
         application = Application.builder().token(token).build()
         
@@ -806,8 +828,23 @@ async def main() -> None:
         
         logger.info("✅ Telegram bot started successfully!")
         
-        # Start polling
-        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+        # Start polling with conflict handling
+        try:
+            await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+            logger.info("✅ Bot polling started successfully!")
+        except Exception as polling_error:
+            if "Conflict" in str(polling_error):
+                logger.warning("⚠️ Bot conflict detected - another instance may be running")
+                logger.info("🔄 Waiting for other instance to stop...")
+                await asyncio.sleep(10)  # Wait 10 seconds
+                try:
+                    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+                    logger.info("✅ Bot polling started after conflict resolution!")
+                except Exception as retry_error:
+                    logger.error(f"❌ Failed to start polling after retry: {retry_error}")
+                    raise
+            else:
+                raise polling_error
         
         # Keep running
         import signal
@@ -828,9 +865,24 @@ async def main() -> None:
 async def shutdown(application):
     """Graceful shutdown"""
     logger.info("🛑 Shutting down bot...")
-    await application.updater.stop()
-    await application.stop()
-    await application.shutdown()
+    
+    # Clean up lock file
+    lock_file = "/tmp/telegram_bot.lock"
+    try:
+        if os.path.exists(lock_file):
+            os.remove(lock_file)
+            logger.info("🧹 Removed lock file")
+    except:
+        pass
+    
+    # Stop bot
+    try:
+        await application.updater.stop()
+        await application.stop()
+        await application.shutdown()
+        logger.info("✅ Bot shutdown complete")
+    except Exception as e:
+        logger.error(f"❌ Error during shutdown: {e}")
 
 if __name__ == '__main__':
     asyncio.run(main())
