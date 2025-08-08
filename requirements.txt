@@ -1,0 +1,11 @@
+python-telegram-bot
+google-generativeai
+google-api-python-client
+google-auth-oauthlib
+feedparser
+python-dateutil
+pytz
+openai
+fastapi
+uvicorn
+aiofiles
