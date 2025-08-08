@@ -44,9 +44,59 @@ SCOPES = [
     'https://www.googleapis.com/auth/tasks'
 ]
 
-# Store for OAuth flows (in production, use Redis or database)
+# Store for OAuth flows - persisted to file for Render
 oauth_flows: Dict[str, Flow] = {}
 account_tokens: Dict[str, dict] = {}
+
+def save_oauth_flow(flow_id: str, flow_data: dict):
+    """Save OAuth flow data to file"""
+    flows_file = "oauth_flows.json"
+    flows = {}
+    
+    if os.path.exists(flows_file):
+        try:
+            with open(flows_file, 'r') as f:
+                flows = json.load(f)
+        except:
+            flows = {}
+    
+    flows[flow_id] = flow_data
+    
+    with open(flows_file, 'w') as f:
+        json.dump(flows, f, indent=2)
+
+def load_oauth_flow(flow_id: str) -> dict:
+    """Load OAuth flow data from file"""
+    flows_file = "oauth_flows.json"
+    
+    if not os.path.exists(flows_file):
+        return None
+    
+    try:
+        with open(flows_file, 'r') as f:
+            flows = json.load(f)
+        return flows.get(flow_id)
+    except:
+        return None
+
+def delete_oauth_flow(flow_id: str):
+    """Delete OAuth flow data from file"""
+    flows_file = "oauth_flows.json"
+    
+    if not os.path.exists(flows_file):
+        return
+    
+    try:
+        with open(flows_file, 'r') as f:
+            flows = json.load(f)
+        
+        if flow_id in flows:
+            del flows[flow_id]
+            
+        with open(flows_file, 'w') as f:
+            json.dump(flows, f, indent=2)
+    except:
+        pass
 
 def get_oauth_config():
     """Get OAuth configuration from environment or file"""
@@ -104,6 +154,15 @@ async def start_oauth(account_email: str):
         flow_id = f"flow_{account_email}"
         oauth_flows[flow_id] = flow
         
+        # Save flow data to file for persistence
+        flow_data = {
+            'client_config': oauth_config,
+            'scopes': SCOPES,
+            'redirect_uri': get_redirect_uri(),
+            'account_email': account_email
+        }
+        save_oauth_flow(flow_id, flow_data)
+        
         # Generate authorization URL
         authorization_url, state = flow.authorization_url(
             access_type='offline',
@@ -134,11 +193,24 @@ async def oauth_callback(request: Request):
         account_email = state
         flow_id = f"flow_{account_email}"
         
-        if flow_id not in oauth_flows:
-            return HTMLResponse("<h1>❌ Error</h1><p>Flujo OAuth no encontrado</p>")
+        # Try to get flow from memory first, then from file
+        flow = oauth_flows.get(flow_id)
+        
+        if not flow:
+            # Try to load from file
+            flow_data = load_oauth_flow(flow_id)
+            if not flow_data:
+                return HTMLResponse("<h1>❌ Error</h1><p>Flujo OAuth no encontrado. Intenta de nuevo desde el inicio.</p>")
+            
+            # Recreate flow from saved data
+            flow = Flow.from_client_config(
+                flow_data['client_config'],
+                scopes=flow_data['scopes'],
+                redirect_uri=flow_data['redirect_uri']
+            )
+            oauth_flows[flow_id] = flow
         
         # Complete OAuth flow
-        flow = oauth_flows[flow_id]
         flow.fetch_token(code=code)
         
         # Store credentials
@@ -156,8 +228,10 @@ async def oauth_callback(request: Request):
         # Save to file
         await save_account_tokens()
         
-        # Clean up flow
-        del oauth_flows[flow_id]
+        # Clean up flow from memory and file
+        if flow_id in oauth_flows:
+            del oauth_flows[flow_id]
+        delete_oauth_flow(flow_id)
         
         return HTMLResponse(f"""
         <html>
