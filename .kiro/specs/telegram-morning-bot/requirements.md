@@ -32,8 +32,9 @@ Bot de Telegram completamente funcional que actúa como asistente personal intel
 4. WHEN se ejecutan las operaciones en paralelo THEN el sistema SHALL mantener la funcionalidad existente de noticias RSS resumidas por IA
 5. WHEN se ejecutan las operaciones en paralelo THEN el sistema SHALL mantener la funcionalidad existente de eventos de Google Calendar
 6. WHEN se ejecutan las operaciones en paralelo THEN el sistema SHALL mantener la funcionalidad existente de tareas de Google Tasks
-7. WHEN se genera el brief optimizado THEN el sistema SHALL completar la operación en menos de 25 segundos
-8. WHEN ocurren errores en operaciones paralelas THEN el sistema SHALL manejar errores individualmente sin afectar otras operaciones
+7. WHEN se genera el brief optimizado THEN el sistema SHALL responder inmediatamente y procesar en background para evitar timeout de Telegram
+8. WHEN se procesa el brief en background THEN el sistema SHALL completar la operación en menos de 20 segundos con timeout de seguridad
+9. WHEN ocurren errores en operaciones paralelas THEN el sistema SHALL manejar errores individualmente sin afectar otras operaciones
 
 ### Requirement 2: Sistema de Gestión de Tareas Locales
 

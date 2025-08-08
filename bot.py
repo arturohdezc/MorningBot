@@ -371,31 +371,34 @@ async def cmd_ia(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # Placeholder functions for existing commands (to be implemented later)
 async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Generate morning brief with parallel processing"""
-    # Send initial message
-    status_message = await update.message.reply_text("📰 Generando brief matutino... ⏳")
+    """Generate morning brief with immediate response and background processing"""
+    # Respond immediately to avoid Telegram timeout
+    await update.message.reply_text("📰 Generando brief matutino... ⏳")
     
+    # Process in background with shorter timeout
+    asyncio.create_task(generate_brief_background(update, context))
+
+async def generate_brief_background(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Generate brief in background to avoid Telegram timeouts"""
     try:
-        # Start parallel operations with timeout
         start_time = datetime.now()
         
-        # Create tasks for parallel execution
+        # Create tasks for parallel execution with shorter timeout
         news_task = asyncio.create_task(fetch_and_summarize_news())
         gmail_task = asyncio.create_task(fetch_and_rank_emails())
         calendar_task = asyncio.create_task(fetch_todays_events())
         tasks_task = asyncio.create_task(fetch_all_tasks())
         
-        # Wait for all tasks with 25-second timeout
+        # Wait for all tasks with 20-second timeout (safer margin)
         try:
             news_data, emails_data, calendar_data, tasks_data = await asyncio.wait_for(
                 asyncio.gather(news_task, gmail_task, calendar_task, tasks_task),
-                timeout=25.0
+                timeout=20.0
             )
         except asyncio.TimeoutError:
-            await status_message.edit_text("⚠️ Brief generado parcialmente (timeout de 25s)")
             # Get whatever results are available
-            news_data = news_task.result() if news_task.done() else {"summary": "Timeout en noticias"}
-            emails_data = gmail_task.result() if gmail_task.done() else {"found": 0, "considered": 0, "selected": 0, "emails": []}
+            news_data = news_task.result() if news_task.done() else {"summary": "⏱ Timeout en noticias", "count": 0}
+            emails_data = gmail_task.result() if gmail_task.done() else {"found": 0, "considered": 0, "selected": 0, "emails": [], "rationale": "⏱ Timeout en emails"}
             calendar_data = calendar_task.result() if calendar_task.done() else []
             tasks_data = tasks_task.result() if tasks_task.done() else []
         
@@ -406,9 +409,7 @@ async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         brief_message = format_brief(news_data, emails_data, calendar_data, tasks_data)
         brief_message += f"\n⏱ Generado en {execution_time:.1f}s"
         
-        # Delete status message and send brief
-        await status_message.delete()
-        
+        # Send the final brief as a new message
         await send_paginated_message(
             bot=context.bot,
             chat_id=update.effective_chat.id,
@@ -417,8 +418,12 @@ async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         
     except Exception as e:
-        logger.error(f"Error in cmd_brief: {e}")
-        await status_message.edit_text("❌ Error al generar el brief. Intenta de nuevo.")
+        logger.error(f"Error in generate_brief_background: {e}")
+        # Send error message
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Error al generar el brief. Intenta de nuevo."
+        )
 
 async def fetch_and_summarize_news() -> Dict:
     """Fetch news and summarize with timeout"""

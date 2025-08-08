@@ -10,7 +10,7 @@ Un bot de Telegram que proporciona un brief matutino personalizado y gestiona ta
 - **Correos Multi-Cuenta**: Soporte para múltiples cuentas Gmail del día anterior
 - **Calendario**: Eventos de Google Calendar del día actual
 - **Tareas**: Tareas pendientes (locales + Google Tasks)
-- **Procesamiento paralelo**: Generación optimizada en <25 segundos
+- **Procesamiento robusto**: Respuesta inmediata + procesamiento en background (evita timeouts de Telegram)
 
 ### Gestión Inteligente de Tareas
 
@@ -299,7 +299,7 @@ SYNC_GOOGLE_TASKS=true
 - `services/ai_client.py` - Cliente unificado de IA (Gemini/OpenRouter)
 - `services/formatter.py` - Paginación y formato de mensajes
 - `services/news.py` - Lectura de RSS feeds
-- `services/gmail_reader.py` - Integración con Gmail
+- `services/gmail_multi_account.py` - Integración multi-cuenta Gmail
 - `services/calendar_reader.py` - Integración con Google Calendar
 - `services/tasks_reader.py` - Integración con Google Tasks
 - `services/ai_fallbacks.py` - Sistema de fallbacks
@@ -316,7 +316,8 @@ SYNC_GOOGLE_TASKS=true
 
 ### Estrategias
 
-- **Timeouts**: 25 segundos máximo para brief
+- **Timeout de Telegram**: Respuesta inmediata + procesamiento en background
+- **Timeouts de servicios**: 20 segundos máximo con resultados parciales
 - **Fallbacks**: Heurística cuando falla IA
 - **Validación**: Entrada de usuario y formatos
 - **Logging**: Errores registrados para debugging

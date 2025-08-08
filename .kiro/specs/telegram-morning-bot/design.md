@@ -34,7 +34,7 @@ graph TB
     
     Bot --> AIConfig[services/ai_config.py - CONFIGURACIÓN]
     Bot --> News[services/news.py - IA MULTI-PROVEEDOR]
-    Bot --> Gmail[services/gmail_reader.py - MULTI-CUENTA]
+    Bot --> Gmail[services/gmail_multi_account.py - MULTI-CUENTA]
     Bot --> Calendar[services/calendar_reader.py - INTEGRADO]
     Bot --> TasksLocal[services/tasks_local.py - RRULE COMPLETO]
     Bot --> TasksReader[services/tasks_reader.py - SYNC BIDIRECCIONAL]
@@ -71,7 +71,7 @@ graph TB
 - **services/tasks_reader.py** ✅ - Sincronización bidireccional con Google Tasks
 
 ### Communication Services
-- **services/gmail_reader.py** ✅ - Soporte multi-cuenta con procesamiento paralelo
+- **services/gmail_multi_account.py** ✅ - Soporte multi-cuenta con procesamiento paralelo
 - **services/email_ranker.py** ✅ - Ranking inteligente multi-cuenta con IA
 - **services/calendar_reader.py** ✅ - Integración Google Calendar
 - **services/news.py** ✅ - Lectura RSS feeds
@@ -368,10 +368,11 @@ async def generate_brief():
     return format_brief(news, emails, events, tasks)
 ```
 
-### Límite de Tiempo
-- Mantener ejecución total ≤ 25 segundos
-- Implementar timeouts individuales para cada operación
-- Si una operación falla, continuar con las demás
+### Límite de Tiempo y Timeout de Telegram
+- **Respuesta inmediata**: Bot responde en <2 segundos para evitar timeout de Telegram
+- **Procesamiento en background**: Brief se genera en background con timeout de 20 segundos
+- **Timeouts individuales**: Cada operación tiene timeout específico
+- **Resultados parciales**: Si una operación falla, continuar con las demás
 
 ## Security Considerations
 
