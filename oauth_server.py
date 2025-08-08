@@ -163,10 +163,11 @@ async def start_oauth(account_email: str):
         }
         save_oauth_flow(flow_id, flow_data)
         
-        # Generate authorization URL
+        # Generate authorization URL with forced refresh token
         authorization_url, state = flow.authorization_url(
             access_type='offline',
             include_granted_scopes='true',
+            prompt='consent',  # Force consent screen to get refresh token
             state=account_email  # Pass account email in state
         )
         
@@ -215,6 +216,31 @@ async def oauth_callback(request: Request):
         
         # Store credentials
         credentials = flow.credentials
+        
+        # Validate that we have refresh_token
+        if not credentials.refresh_token:
+            print(f"⚠️ No refresh_token received for {account_email}")
+            return HTMLResponse(f"""
+            <html>
+                <head><title>⚠️ Error de OAuth</title></head>
+                <body>
+                    <h1>⚠️ Error: No se obtuvo refresh_token</h1>
+                    <p><strong>Cuenta:</strong> {account_email}</p>
+                    <p>Google no proporcionó un refresh_token. Esto puede pasar si:</p>
+                    <ul>
+                        <li>Ya autorizaste esta app antes</li>
+                        <li>No se forzó la pantalla de consentimiento</li>
+                    </ul>
+                    <p><strong>Solución:</strong></p>
+                    <ol>
+                        <li>Ve a <a href="https://myaccount.google.com/permissions" target="_blank">Google Account Permissions</a></li>
+                        <li>Revoca el acceso a "Arturo Multi-Account Bot"</li>
+                        <li><a href="/auth/{account_email}">Intenta autorizar de nuevo</a></li>
+                    </ol>
+                </body>
+            </html>
+            """)
+        
         account_tokens[account_email] = {
             'token': credentials.token,
             'refresh_token': credentials.refresh_token,
@@ -224,6 +250,8 @@ async def oauth_callback(request: Request):
             'scopes': credentials.scopes,
             'expiry': credentials.expiry.isoformat() if credentials.expiry else None
         }
+        
+        print(f"✅ Stored complete credentials for {account_email} (including refresh_token)")
         
         # Save to file
         await save_account_tokens()

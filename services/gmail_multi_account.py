@@ -166,65 +166,51 @@ async def fetch_emails_from_specific_account(account_email: str) -> List[Dict]:
         
         print(f"✅ Gmail service obtained for {account_email}")
         
-        # Calculate date range (last 30 days for comprehensive testing)
+        # Calculate date range (today and yesterday - dynamic dates)
         now = datetime.now()
-        thirty_days_ago = now - timedelta(days=30)
+        today = now.date()
+        yesterday = (now - timedelta(days=1)).date()
+        
+        # Start from yesterday 00:00:00
+        yesterday_start = datetime.combine(yesterday, datetime.min.time())
+        # End at today 23:59:59
+        today_end = datetime.combine(today, datetime.max.time())
         
         # Format dates for Gmail API
-        after_date = thirty_days_ago.strftime('%Y/%m/%d')
-        before_date = now.strftime('%Y/%m/%d')
+        after_date = yesterday_start.strftime('%Y/%m/%d')
+        before_date = today_end.strftime('%Y/%m/%d')
         
-        # Search query - try multiple approaches
-        queries_to_try = [
-            f'after:{after_date}',  # Just after date, no before limit
-            'in:inbox',  # All inbox emails
-            'is:unread',  # Unread emails
-            ''  # All emails (no filter)
-        ]
+        # Search query for today and yesterday emails (no quantity limit)
+        query = f'after:{after_date} before:{before_date}'
         
         print(f"📅 Searching emails for {account_email}")
-        print(f"📅 Date range: {thirty_days_ago.strftime('%Y-%m-%d')} to {now.strftime('%Y-%m-%d')}")
+        print(f"📅 Date range: {yesterday.strftime('%Y-%m-%d')} (ayer) to {today.strftime('%Y-%m-%d')} (hoy)")
+        print(f"🔍 Using query: '{query}'")
         
-        # Try different queries until we find emails
-        messages = []
-        for i, query in enumerate(queries_to_try):
-            print(f"🔍 Trying query {i+1}: '{query}'")
-        
-            try:
-                results = service.users().messages().list(
-                    userId='me',
-                    q=query,
-                    maxResults=50
-                ).execute()
-                
-                messages = results.get('messages', [])
-                print(f"📧 Query '{query}' found {len(messages)} messages")
-                
-                if messages:
-                    print(f"✅ Success! Using query: '{query}'")
-                    break
-                    
-            except Exception as query_error:
-                print(f"❌ Query '{query}' failed: {query_error}")
-                continue
+        try:
+            # Get all messages from today and yesterday (no artificial limit)
+            results = service.users().messages().list(
+                userId='me',
+                q=query,
+                maxResults=500  # High limit to get all emails from today+yesterday
+            ).execute()
+            
+            messages = results.get('messages', [])
+            print(f"📧 Found {len(messages)} messages from today and yesterday")
+            
+        except Exception as query_error:
+            print(f"❌ Gmail API query failed: {query_error}")
+            messages = []
         
         if not messages:
-            print(f"❌ No messages found with any query for {account_email}")
-            
-            # Try to get basic account info to verify connection
-            try:
-                profile = service.users().getProfile(userId='me').execute()
-                print(f"✅ Gmail connection verified - Email: {profile.get('emailAddress')}")
-                print(f"📊 Total messages in account: {profile.get('messagesTotal', 'unknown')}")
-                print(f"📊 Total threads: {profile.get('threadsTotal', 'unknown')}")
-            except Exception as profile_error:
-                print(f"❌ Cannot get Gmail profile: {profile_error}")
-            
+            print(f"ℹ️ No messages found for {account_email} from today and yesterday")
             return []
         
         emails = []
-        for i, message in enumerate(messages[:50]):  # Limit per account
-            print(f"📄 Processing message {i+1}/{len(messages[:50])} for {account_email}")
+        total_messages = len(messages)
+        print(f"📄 Processing {total_messages} messages for {account_email}")
+        
+        for i, message in enumerate(messages):  # Process ALL messages from today+yesterday
             try:
                 # Get full message
                 msg = service.users().messages().get(
@@ -256,7 +242,12 @@ async def fetch_emails_from_specific_account(account_email: str) -> List[Dict]:
                 }
                 
                 emails.append(email_data)
-                print(f"📧 Email {i+1}: {subject[:50]}... from {sender[:30]}...")
+                
+                # Only log first few and last few to avoid spam
+                if i < 3 or i >= total_messages - 3:
+                    print(f"📧 Email {i+1}/{total_messages}: {subject[:50]}... from {sender[:30]}...")
+                elif i == 3:
+                    print(f"📧 ... processing emails 4-{total_messages-3} ...")
                 
             except Exception as e:
                 print(f"❌ Error processing email {message['id']} from {account_email}: {e}")
@@ -282,8 +273,15 @@ async def fetch_all_accounts_emails() -> List[Dict]:
         for account_email in TARGET_ACCOUNTS:
             tasks.append(fetch_emails_from_specific_account(account_email))
         
-        # Execute in parallel
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Execute in parallel with timeout
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=20.0  # 20 second timeout for all accounts
+            )
+        except asyncio.TimeoutError:
+            print("⏱️ Gmail fetch timeout - using partial results")
+            results = []
         
         # Combine results
         all_emails = []
@@ -294,12 +292,11 @@ async def fetch_all_accounts_emails() -> List[Dict]:
                 account = TARGET_ACCOUNTS[i] if i < len(TARGET_ACCOUNTS) else 'unknown'
                 print(f"❌ Error fetching from {account}: {result}")
         
-        # Sort by date (newest first) and limit total
+        # Sort by date (newest first) - NO quantity limit, all emails from today+yesterday
         all_emails = sorted(all_emails, key=lambda x: x.get('date', ''), reverse=True)
-        limited_emails = all_emails[:200]  # Limit total emails
         
-        print(f"✅ Total emails fetched: {len(limited_emails)} from {len(TARGET_ACCOUNTS)} accounts")
-        return limited_emails
+        print(f"✅ Total emails fetched: {len(all_emails)} from {len(TARGET_ACCOUNTS)} accounts (today + yesterday)")
+        return all_emails
         
     except Exception as e:
         print(f"❌ Error in multi-account email fetch: {e}")
