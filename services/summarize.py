@@ -28,14 +28,18 @@ async def summarize_news_list(news_items: List[Dict]) -> str:
             news_text += f"Fecha: {item.get('published', '')}\n\n"
         
         system_prompt = """
-Eres un asistente que resume noticias para un brief matutino.
+Eres un asistente que resume noticias para un brief matutino ejecutivo.
 
-Crea un resumen conciso de las noticias proporcionadas:
-- Comienza con un TL;DR de 1-2 líneas
-- Luego agrega 3-5 bullets con los puntos más importantes
-- Incluye fechas relevantes y actores principales
-- Mantén un tono informativo pero accesible
-- Máximo 300 palabras
+Las noticias cubren estas categorías: Economía (México, US, Mundial), Noticias Generales (México, US, Mundial), Inteligencia Artificial y Viajes.
+
+Crea un resumen estructurado:
+- **TL;DR**: 1-2 líneas con lo más relevante del día
+- **📈 ECONOMÍA**: Principales movimientos económicos y de mercados
+- **🌍 NOTICIAS GENERALES**: Eventos importantes por región
+- **🤖 IA & TECH**: Novedades en inteligencia artificial (si las hay)
+- **✈️ VIAJES**: Noticias de turismo y viajes (si las hay)
+
+Mantén cada sección en 2-3 bullets máximo. Tono profesional pero accesible. Máximo 350 palabras.
 """
         
         prompt = f"Noticias a resumir:\n{news_text}"
