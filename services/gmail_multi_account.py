@@ -35,24 +35,44 @@ def load_account_credentials() -> Dict[str, Credentials]:
         with open(tokens_file, 'r') as f:
             tokens_data = json.load(f)
         
+        print(f"🔍 Found {len(tokens_data)} accounts in tokens file")
+        
         for account_email, token_data in tokens_data.items():
+            print(f"📧 Processing account: {account_email}")
+            
+            # Validate token data
+            required_fields = ['token', 'refresh_token', 'token_uri', 'client_id', 'client_secret']
+            missing_fields = [field for field in required_fields if not token_data.get(field)]
+            
+            if missing_fields:
+                print(f"⚠️ Account {account_email} missing fields: {missing_fields}")
+                continue
+            
             # Create credentials object
-            creds = Credentials(
-                token=token_data.get('token'),
-                refresh_token=token_data.get('refresh_token'),
-                token_uri=token_data.get('token_uri'),
-                client_id=token_data.get('client_id'),
-                client_secret=token_data.get('client_secret'),
-                scopes=token_data.get('scopes')
-            )
+            try:
+                creds = Credentials(
+                    token=token_data.get('token'),
+                    refresh_token=token_data.get('refresh_token'),
+                    token_uri=token_data.get('token_uri'),
+                    client_id=token_data.get('client_id'),
+                    client_secret=token_data.get('client_secret'),
+                    scopes=token_data.get('scopes')
+                )
+                
+                account_credentials[account_email] = creds
+                print(f"✅ Successfully loaded credentials for {account_email}")
+                
+            except Exception as cred_error:
+                print(f"❌ Error creating credentials for {account_email}: {cred_error}")
+                continue
             
-            account_credentials[account_email] = creds
-            
-        print(f"✅ Loaded credentials for {len(account_credentials)} accounts")
+        print(f"✅ Total loaded credentials: {len(account_credentials)} accounts")
         return account_credentials
         
     except Exception as e:
         print(f"❌ Error loading account credentials: {e}")
+        import traceback
+        traceback.print_exc()
         return {}
 
 def get_gmail_service_for_account(account_email: str) -> Optional[object]:
@@ -123,25 +143,31 @@ async def fetch_emails_from_specific_account(account_email: str) -> List[Dict]:
         List of email data from the account
     """
     try:
+        print(f"🔍 Attempting to fetch emails from {account_email}")
         service = get_gmail_service_for_account(account_email)
         
         if not service:
             print(f"⚠️ Could not get Gmail service for {account_email}")
             return []
         
-        # Calculate yesterday's date range
+        print(f"✅ Gmail service obtained for {account_email}")
+        
+        # Calculate yesterday's date range (or last 2 days for testing)
         yesterday = datetime.now() - timedelta(days=1)
-        yesterday_start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+        two_days_ago = datetime.now() - timedelta(days=2)
+        yesterday_start = two_days_ago.replace(hour=0, minute=0, second=0, microsecond=0)
         yesterday_end = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
         
         # Format dates for Gmail API
         after_date = yesterday_start.strftime('%Y/%m/%d')
         before_date = yesterday_end.strftime('%Y/%m/%d')
         
-        # Search query for yesterday's emails
+        # Search query for recent emails (expanded to 2 days for testing)
         query = f'after:{after_date} before:{before_date}'
+        print(f"📅 Searching emails with query: {query}")
         
         # Get message IDs
+        print(f"🔍 Querying Gmail API for {account_email}...")
         results = service.users().messages().list(
             userId='me',  # Always 'me' for the authenticated account
             q=query,
@@ -149,9 +175,15 @@ async def fetch_emails_from_specific_account(account_email: str) -> List[Dict]:
         ).execute()
         
         messages = results.get('messages', [])
+        print(f"📧 Found {len(messages)} messages for {account_email}")
+        
+        if not messages:
+            print(f"ℹ️ No messages found for {account_email} in date range {after_date} to {before_date}")
+            return []
         
         emails = []
-        for message in messages[:50]:  # Limit per account
+        for i, message in enumerate(messages[:50]):  # Limit per account
+            print(f"📄 Processing message {i+1}/{len(messages[:50])} for {account_email}")
             try:
                 # Get full message
                 msg = service.users().messages().get(
