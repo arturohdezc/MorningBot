@@ -376,82 +376,130 @@ async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("📰 Generando brief matutino... ⏳")
     
     # Process in background with shorter timeout
-    asyncio.create_task(generate_brief_background(update, context))
+    task = asyncio.create_task(generate_brief_background(update, context))
+    
+    # Add error handling for the background task
+    def handle_task_exception(task):
+        if task.exception():
+            logger.error(f"❌ Background task failed: {task.exception()}")
+    
+    task.add_done_callback(handle_task_exception)
 
 async def generate_brief_background(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Generate brief in background to avoid Telegram timeouts"""
     try:
+        logger.info("🔄 Starting brief generation in background")
         start_time = datetime.now()
         
-        # Create tasks for parallel execution with shorter timeout
-        news_task = asyncio.create_task(fetch_and_summarize_news())
-        gmail_task = asyncio.create_task(fetch_and_rank_emails())
-        calendar_task = asyncio.create_task(fetch_todays_events())
-        tasks_task = asyncio.create_task(fetch_all_tasks())
+        # For debugging, let's try a simpler approach first
+        logger.info("📰 Starting simple sequential execution for debugging")
         
-        # Wait for all tasks with 20-second timeout (safer margin)
+        # Initialize with default values
+        news_data = {"summary": "📰 Noticias no disponibles", "count": 0}
+        emails_data = {"found": 0, "considered": 0, "selected": 0, "emails": [], "rationale": "📧 Emails no disponibles"}
+        calendar_data = []
+        tasks_data = []
+        
+        # Try each operation individually with error handling
         try:
-            news_data, emails_data, calendar_data, tasks_data = await asyncio.wait_for(
-                asyncio.gather(news_task, gmail_task, calendar_task, tasks_task),
-                timeout=20.0
-            )
-        except asyncio.TimeoutError:
-            # Get whatever results are available
-            news_data = news_task.result() if news_task.done() else {"summary": "⏱ Timeout en noticias", "count": 0}
-            emails_data = gmail_task.result() if gmail_task.done() else {"found": 0, "considered": 0, "selected": 0, "emails": [], "rationale": "⏱ Timeout en emails"}
-            calendar_data = calendar_task.result() if calendar_task.done() else []
-            tasks_data = tasks_task.result() if tasks_task.done() else []
+            logger.info("📰 Fetching news...")
+            news_data = await asyncio.wait_for(fetch_and_summarize_news(), timeout=5.0)
+            logger.info("✅ News fetched successfully")
+        except Exception as e:
+            logger.error(f"❌ News fetch failed: {e}")
+        
+        try:
+            logger.info("📧 Fetching emails...")
+            emails_data = await asyncio.wait_for(fetch_and_rank_emails(), timeout=8.0)
+            logger.info("✅ Emails fetched successfully")
+        except Exception as e:
+            logger.error(f"❌ Email fetch failed: {e}")
+        
+        try:
+            logger.info("📅 Fetching calendar...")
+            calendar_data = await asyncio.wait_for(fetch_todays_events(), timeout=3.0)
+            logger.info("✅ Calendar fetched successfully")
+        except Exception as e:
+            logger.error(f"❌ Calendar fetch failed: {e}")
+        
+        try:
+            logger.info("✅ Fetching tasks...")
+            tasks_data = await asyncio.wait_for(fetch_all_tasks(), timeout=2.0)
+            logger.info("✅ Tasks fetched successfully")
+        except Exception as e:
+            logger.error(f"❌ Tasks fetch failed: {e}")
         
         # Calculate execution time
         execution_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"⏱ Brief generation completed in {execution_time:.1f}s")
         
         # Format the brief
+        logger.info("📝 Formatting brief message")
         brief_message = format_brief(news_data, emails_data, calendar_data, tasks_data)
         brief_message += f"\n⏱ Generado en {execution_time:.1f}s"
         
         # Send the final brief as a new message
+        logger.info("📤 Sending brief message to user")
         await send_paginated_message(
             bot=context.bot,
             chat_id=update.effective_chat.id,
             content=brief_message,
             parse_mode='Markdown'
         )
+        logger.info("✅ Brief sent successfully")
         
     except Exception as e:
-        logger.error(f"Error in generate_brief_background: {e}")
+        logger.error(f"❌ Error in generate_brief_background: {e}")
+        import traceback
+        logger.error(f"📋 Full traceback: {traceback.format_exc()}")
+        
         # Send error message
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="❌ Error al generar el brief. Intenta de nuevo."
-        )
+        try:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"❌ Error al generar el brief: {str(e)}\nIntenta de nuevo."
+            )
+        except Exception as send_error:
+            logger.error(f"❌ Failed to send error message: {send_error}")
 
 async def fetch_and_summarize_news() -> Dict:
     """Fetch news and summarize with timeout"""
     try:
+        logger.info("📰 Fetching news from RSS feeds")
         # Use default RSS feeds
         rss_urls = []  # Will use defaults in fetch_news_from_rss
         news_items = await fetch_news_from_rss(rss_urls)
+        logger.info(f"📰 Found {len(news_items)} news items")
+        
+        logger.info("🤖 Summarizing news with AI")
         summary = await summarize_news_list(news_items)
+        logger.info("✅ News summary completed")
         
         return {
             "summary": summary,
             "count": len(news_items)
         }
     except Exception as e:
-        print(f"Error in fetch_and_summarize_news: {e}")
+        logger.error(f"❌ Error in fetch_and_summarize_news: {e}")
         return {"summary": "Error al obtener noticias", "count": 0}
 
 async def fetch_and_rank_emails() -> Dict:
     """Fetch and rank emails with timeout"""
     try:
+        logger.info("📧 Fetching yesterday's emails")
         # Fetch yesterday's emails
         emails = await fetch_yesterdays_emails()
+        logger.info(f"📧 Found {len(emails)} emails")
         
         # Pre-filter by preferences
+        logger.info("🔍 Pre-filtering emails by preferences")
         filtered_emails, original_count = prefilter_by_prefs(emails)
+        logger.info(f"🔍 Filtered to {len(filtered_emails)} emails from {original_count} total")
         
         # Rank with Gemini
+        logger.info("🤖 Ranking emails with AI")
         ranked_result = await rank_emails_with_gemini(filtered_emails, top_k=10)
+        logger.info(f"✅ Email ranking completed, selected {ranked_result.get('selected', 0)} emails")
         
         # Add original count
         ranked_result["found"] = original_count
@@ -459,7 +507,7 @@ async def fetch_and_rank_emails() -> Dict:
         return ranked_result
         
     except Exception as e:
-        print(f"Error in fetch_and_rank_emails: {e}")
+        logger.error(f"❌ Error in fetch_and_rank_emails: {e}")
         return {
             "found": 0,
             "considered": 0,
@@ -471,23 +519,28 @@ async def fetch_and_rank_emails() -> Dict:
 async def fetch_all_tasks() -> List[Dict]:
     """Fetch all tasks (local + Google Tasks if enabled)"""
     try:
+        logger.info("✅ Fetching local tasks")
         # Get local tasks
         local_tasks = list_today_sorted(TIMEZONE)
+        logger.info(f"✅ Found {len(local_tasks)} local tasks")
         
         # Get Google Tasks if sync enabled
         google_tasks = []
         if os.getenv("SYNC_GOOGLE_TASKS", "false").lower() == "true":
             try:
+                logger.info("📱 Fetching Google Tasks")
                 google_tasks = await fetch_pending_tasks()
+                logger.info(f"📱 Found {len(google_tasks)} Google Tasks")
             except Exception as e:
-                print(f"Error fetching Google Tasks: {e}")
+                logger.error(f"❌ Error fetching Google Tasks: {e}")
         
         # Combine and limit
         all_tasks = local_tasks + google_tasks
+        logger.info(f"✅ Total tasks: {len(all_tasks)}, limiting to 10 for brief")
         return all_tasks[:10]  # Limit to 10 for brief
         
     except Exception as e:
-        print(f"Error in fetch_all_tasks: {e}")
+        logger.error(f"❌ Error in fetch_all_tasks: {e}")
         return []
 
 async def cmd_prefs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
