@@ -6,6 +6,7 @@ Handles OAuth flow for multiple Google accounts
 
 import os
 import json
+import base64
 import asyncio
 from typing import Dict, List
 from fastapi import FastAPI, Request, HTTPException
@@ -15,6 +16,26 @@ from google.oauth2.credentials import Credentials
 import uvicorn
 
 app = FastAPI(title="Gmail Multi-Account OAuth Server")
+
+# Setup Google credentials for Render deployment
+def setup_google_credentials_for_oauth():
+    """Decode Google credentials from environment variables for OAuth server"""
+    try:
+        # Decode credentials.json from base64 if available
+        credentials_b64 = os.getenv('CREDENTIALS_JSON_BASE64')
+        if credentials_b64:
+            credentials_data = base64.b64decode(credentials_b64).decode('utf-8')
+            with open('credentials.json', 'w') as f:
+                f.write(credentials_data)
+            print("✅ OAuth: credentials.json decoded from environment")
+        else:
+            print("⚠️ OAuth: CREDENTIALS_JSON_BASE64 not found in environment")
+            
+    except Exception as e:
+        print(f"❌ OAuth: Could not decode Google credentials: {e}")
+
+# Setup credentials when module loads
+setup_google_credentials_for_oauth()
 
 # OAuth configuration
 SCOPES = [
