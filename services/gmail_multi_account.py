@@ -61,6 +61,7 @@ def load_account_credentials() -> Dict[str, Credentials]:
                 
                 account_credentials[account_email] = creds
                 print(f"✅ Successfully loaded credentials for {account_email}")
+                print(f"🔐 Scopes: {token_data.get('scopes', [])}")
                 
             except Exception as cred_error:
                 print(f"❌ Error creating credentials for {account_email}: {cred_error}")
@@ -86,13 +87,26 @@ def get_gmail_service_for_account(account_email: str) -> Optional[object]:
     try:
         creds = account_credentials[account_email]
         
-        # Refresh token if needed
+        # Check and refresh token if needed
+        print(f"🔍 Checking token status for {account_email}")
+        print(f"🔍 Token expired: {creds.expired}")
+        print(f"🔍 Has refresh token: {bool(creds.refresh_token)}")
+        
         if creds.expired and creds.refresh_token:
-            from google.auth.transport.requests import Request
-            creds.refresh(Request())
-            
-            # Save updated token
-            save_updated_credentials(account_email, creds)
+            print(f"🔄 Refreshing expired token for {account_email}")
+            try:
+                from google.auth.transport.requests import Request
+                creds.refresh(Request())
+                print(f"✅ Token refreshed successfully for {account_email}")
+                
+                # Save updated token
+                save_updated_credentials(account_email, creds)
+            except Exception as refresh_error:
+                print(f"❌ Failed to refresh token for {account_email}: {refresh_error}")
+                return None
+        elif creds.expired:
+            print(f"❌ Token expired for {account_email} and no refresh token available")
+            return None
         
         return build('gmail', 'v1', credentials=creds)
         
@@ -152,32 +166,60 @@ async def fetch_emails_from_specific_account(account_email: str) -> List[Dict]:
         
         print(f"✅ Gmail service obtained for {account_email}")
         
-        # Calculate date range (last 7 days for better testing)
+        # Calculate date range (last 30 days for comprehensive testing)
         now = datetime.now()
-        seven_days_ago = now - timedelta(days=7)
+        thirty_days_ago = now - timedelta(days=30)
         
         # Format dates for Gmail API
-        after_date = seven_days_ago.strftime('%Y/%m/%d')
+        after_date = thirty_days_ago.strftime('%Y/%m/%d')
         before_date = now.strftime('%Y/%m/%d')
         
-        # Search query for recent emails (expanded to 7 days for testing)
-        query = f'after:{after_date} before:{before_date}'
-        print(f"📅 Searching emails for {account_email} with query: {query}")
-        print(f"📅 Date range: {seven_days_ago.strftime('%Y-%m-%d')} to {now.strftime('%Y-%m-%d')}")
+        # Search query - try multiple approaches
+        queries_to_try = [
+            f'after:{after_date}',  # Just after date, no before limit
+            'in:inbox',  # All inbox emails
+            'is:unread',  # Unread emails
+            ''  # All emails (no filter)
+        ]
         
-        # Get message IDs
-        print(f"🔍 Querying Gmail API for {account_email}...")
-        results = service.users().messages().list(
-            userId='me',  # Always 'me' for the authenticated account
-            q=query,
-            maxResults=50  # Limit per account
-        ).execute()
+        print(f"📅 Searching emails for {account_email}")
+        print(f"📅 Date range: {thirty_days_ago.strftime('%Y-%m-%d')} to {now.strftime('%Y-%m-%d')}")
         
-        messages = results.get('messages', [])
-        print(f"📧 Found {len(messages)} messages for {account_email}")
+        # Try different queries until we find emails
+        messages = []
+        for i, query in enumerate(queries_to_try):
+            print(f"🔍 Trying query {i+1}: '{query}'")
+        
+            try:
+                results = service.users().messages().list(
+                    userId='me',
+                    q=query,
+                    maxResults=50
+                ).execute()
+                
+                messages = results.get('messages', [])
+                print(f"📧 Query '{query}' found {len(messages)} messages")
+                
+                if messages:
+                    print(f"✅ Success! Using query: '{query}'")
+                    break
+                    
+            except Exception as query_error:
+                print(f"❌ Query '{query}' failed: {query_error}")
+                continue
         
         if not messages:
-            print(f"ℹ️ No messages found for {account_email} in date range {after_date} to {before_date}")
+            print(f"❌ No messages found with any query for {account_email}")
+            
+            # Try to get basic account info to verify connection
+            try:
+                profile = service.users().getProfile(userId='me').execute()
+                print(f"✅ Gmail connection verified - Email: {profile.get('emailAddress')}")
+                print(f"📊 Total messages in account: {profile.get('messagesTotal', 'unknown')}")
+                print(f"📊 Total threads: {profile.get('threadsTotal', 'unknown')}")
+            except Exception as profile_error:
+                print(f"❌ Cannot get Gmail profile: {profile_error}")
+            
             return []
         
         emails = []
