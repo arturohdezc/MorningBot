@@ -9,3 +9,4 @@ openai
 fastapi
 uvicorn
 aiofiles
+python-dotenv
