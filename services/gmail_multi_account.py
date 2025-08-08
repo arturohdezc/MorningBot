@@ -152,19 +152,18 @@ async def fetch_emails_from_specific_account(account_email: str) -> List[Dict]:
         
         print(f"✅ Gmail service obtained for {account_email}")
         
-        # Calculate yesterday's date range (or last 2 days for testing)
-        yesterday = datetime.now() - timedelta(days=1)
-        two_days_ago = datetime.now() - timedelta(days=2)
-        yesterday_start = two_days_ago.replace(hour=0, minute=0, second=0, microsecond=0)
-        yesterday_end = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+        # Calculate date range (last 7 days for better testing)
+        now = datetime.now()
+        seven_days_ago = now - timedelta(days=7)
         
         # Format dates for Gmail API
-        after_date = yesterday_start.strftime('%Y/%m/%d')
-        before_date = yesterday_end.strftime('%Y/%m/%d')
+        after_date = seven_days_ago.strftime('%Y/%m/%d')
+        before_date = now.strftime('%Y/%m/%d')
         
-        # Search query for recent emails (expanded to 2 days for testing)
+        # Search query for recent emails (expanded to 7 days for testing)
         query = f'after:{after_date} before:{before_date}'
-        print(f"📅 Searching emails with query: {query}")
+        print(f"📅 Searching emails for {account_email} with query: {query}")
+        print(f"📅 Date range: {seven_days_ago.strftime('%Y-%m-%d')} to {now.strftime('%Y-%m-%d')}")
         
         # Get message IDs
         print(f"🔍 Querying Gmail API for {account_email}...")
@@ -202,7 +201,7 @@ async def fetch_emails_from_specific_account(account_email: str) -> List[Dict]:
                 # Extract body (simplified)
                 body = extract_message_body(msg['payload'])
                 
-                emails.append({
+                email_data = {
                     'id': message['id'],
                     'subject': subject,
                     'sender': sender,
@@ -212,13 +211,16 @@ async def fetch_emails_from_specific_account(account_email: str) -> List[Dict]:
                     'thread_id': msg.get('threadId', ''),
                     'labels': msg.get('labelIds', []),
                     'account': account_email  # Real account email
-                })
+                }
+                
+                emails.append(email_data)
+                print(f"📧 Email {i+1}: {subject[:50]}... from {sender[:30]}...")
                 
             except Exception as e:
-                print(f"Error processing email {message['id']} from {account_email}: {e}")
+                print(f"❌ Error processing email {message['id']} from {account_email}: {e}")
                 continue
         
-        print(f"✅ Fetched {len(emails)} emails from {account_email}")
+        print(f"✅ Successfully fetched {len(emails)} emails from {account_email}")
         return emails
         
     except Exception as e:

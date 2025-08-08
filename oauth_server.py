@@ -263,7 +263,7 @@ async def get_status():
                 <tr>
                     <th>Cuenta</th>
                     <th>Estado</th>
-                    <th>Última Actualización</th>
+                    <th>Acciones</th>
                 </tr>
     """
     
@@ -278,45 +278,127 @@ async def get_status():
     for account in target_accounts:
         if account in account_tokens:
             status = "✅ Autenticado"
-            last_update = "Configurado"
+            actions = f'<a href="/test/{account}">🧪 Probar Gmail</a>'
         else:
             status = "❌ No autenticado"
-            last_update = f'<a href="/auth/{account}">Configurar ahora</a>'
+            actions = f'<a href="/auth/{account}">🔧 Configurar</a>'
         
         html += f"""
                 <tr>
                     <td>{account}</td>
                     <td>{status}</td>
-                    <td>{last_update}</td>
+                    <td>{actions}</td>
                 </tr>
         """
     
-    html += """
+    html += f"""
             </table>
             <br>
+            <p><strong>Total cuentas configuradas:</strong> {len(account_tokens)}</p>
             <p><a href="/">← Volver al inicio</a></p>
+            <p><a href="/debug">🔍 Ver información de debug</a></p>
         </body>
     </html>
     """
     
     return HTMLResponse(html)
 
+@app.get("/test/{account_email}")
+async def test_gmail_account(account_email: str):
+    """Test Gmail connectivity for specific account"""
+    try:
+        # Import here to avoid circular imports
+        from services.gmail_multi_account import fetch_emails_from_specific_account
+        
+        print(f"🧪 Testing Gmail connectivity for {account_email}")
+        emails = await fetch_emails_from_specific_account(account_email)
+        
+        return {
+            "account": account_email,
+            "status": "success" if emails else "no_emails",
+            "email_count": len(emails),
+            "emails": emails[:3] if emails else [],  # Show first 3 emails
+            "message": f"Found {len(emails)} emails" if emails else "No emails found in last 7 days"
+        }
+        
+    except Exception as e:
+        return {
+            "account": account_email,
+            "status": "error",
+            "error": str(e),
+            "message": f"Error testing {account_email}: {str(e)}"
+        }
+
+@app.get("/debug")
+async def debug_info():
+    """Show debug information"""
+    await load_account_tokens()
+    
+    debug_data = {
+        "total_accounts": len(account_tokens),
+        "accounts": list(account_tokens.keys()),
+        "environment_variable_set": bool(os.getenv('MULTI_ACCOUNT_TOKENS_BASE64')),
+        "file_exists": os.path.exists("multi_account_tokens.json")
+    }
+    
+    return debug_data
+
 async def save_account_tokens():
-    """Save account tokens to file"""
+    """Save account tokens to file and environment variable for persistence"""
     tokens_file = "multi_account_tokens.json"
+    
+    # Save to file (temporary)
     with open(tokens_file, 'w') as f:
         json.dump(account_tokens, f, indent=2)
     print(f"✅ Tokens guardados en {tokens_file}")
+    
+    # Also encode and save to environment variable for persistence
+    try:
+        import base64
+        tokens_json = json.dumps(account_tokens)
+        tokens_b64 = base64.b64encode(tokens_json.encode()).decode()
+        
+        # In production, you would set this as an environment variable
+        # For now, we'll save it to a persistent file that can be manually copied
+        with open('tokens_backup.txt', 'w') as f:
+            f.write(f"MULTI_ACCOUNT_TOKENS_BASE64={tokens_b64}\n")
+        
+        print(f"💾 Backup tokens saved - copy to Render environment variable:")
+        print(f"MULTI_ACCOUNT_TOKENS_BASE64={tokens_b64[:50]}...")
+        
+    except Exception as e:
+        print(f"⚠️ Could not create backup: {e}")
 
 async def load_account_tokens():
-    """Load account tokens from file"""
+    """Load account tokens from environment variable or file"""
     global account_tokens
     tokens_file = "multi_account_tokens.json"
     
+    # Try to load from environment variable first (persistent)
+    tokens_b64 = os.getenv('MULTI_ACCOUNT_TOKENS_BASE64')
+    if tokens_b64:
+        try:
+            import base64
+            tokens_json = base64.b64decode(tokens_b64).decode()
+            account_tokens = json.loads(tokens_json)
+            
+            # Also save to file for other services
+            with open(tokens_file, 'w') as f:
+                json.dump(account_tokens, f, indent=2)
+                
+            print(f"✅ Tokens cargados desde variable de entorno (persistente)")
+            print(f"📧 Cuentas configuradas: {len(account_tokens)}")
+            return
+        except Exception as e:
+            print(f"⚠️ Error loading from environment: {e}")
+    
+    # Fallback to file
     if os.path.exists(tokens_file):
         with open(tokens_file, 'r') as f:
             account_tokens = json.load(f)
         print(f"✅ Tokens cargados desde {tokens_file}")
+    else:
+        print("ℹ️ No tokens found - accounts need to be configured")
 
 @app.on_event("startup")
 async def startup_event():
