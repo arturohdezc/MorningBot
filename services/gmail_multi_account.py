@@ -13,13 +13,13 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import base64
 
-# Target accounts to read from
+# Target accounts to read from - Configure via environment variable
 TARGET_ACCOUNTS = [
-    "arturohcenturion@gmail.com",
-    "tlapalerialavictoria@gmail.com",
-    "arturo@nowgrowpro.com",
-    "determinarte@gmail.com",
-    "arturohdez.92@gmail.com",
+    "user1@example.com",
+    "user2@example.com", 
+    "user3@example.com",
+    "user4@example.com",
+    "user5@example.com",
 ]
 
 

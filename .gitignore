@@ -8,6 +8,10 @@ credentials.json
 token.json
 multi_account_tokens.json
 
+# Sensitive configuration files
+.kiro/specs/*/sensitive_*
+tokens_backup.txt
+
 # Local data files
 tasks_db.json
 ai_config.json
