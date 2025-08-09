@@ -4,13 +4,14 @@ Un bot de Telegram que proporciona un brief matutino personalizado y gestiona ta
 
 ## 🚀 Características
 
-### Brief Matutino Automatizado
+### Brief Matutino Automatizado con Sistema Progresivo
 
-- **Noticias**: Resumen de RSS feeds usando Gemini
-- **Correos Multi-Cuenta**: Soporte para múltiples cuentas Gmail del día anterior
+- **Noticias Categorizadas**: Economía, Noticias Generales, IA & Tech, Viajes por región (México, US, Mundial)
+- **Correos Multi-Cuenta**: Soporte para múltiples cuentas Gmail con formato mejorado
 - **Calendario**: Eventos de Google Calendar del día actual
 - **Tareas**: Tareas pendientes (locales + Google Tasks)
-- **Procesamiento robusto**: Respuesta inmediata + procesamiento en background (evita timeouts de Telegram)
+- **Sistema Progresivo**: Brief tipo "sprints" - muestra progreso cada 8s, sin timeouts de Telegram
+- **Cache Inteligente**: Briefs instantáneos si son recientes (30 min)
 
 ### Gestión Inteligente de Tareas
 
@@ -20,17 +21,20 @@ Un bot de Telegram que proporciona un brief matutino personalizado y gestiona ta
 - **Sincronización opcional**: Con Google Tasks
 - **Prioridades**: high/medium/low con ordenamiento automático
 
-### Router de IA Multi-Proveedor
+### Router de IA Multi-Proveedor (12 Modelos Disponibles)
 
-- **Gemini 1.5 Flash**: Análisis inteligente usando Google Generative AI
-- **OpenRouter**: Soporte para GPT-4, Claude, y otros modelos via OpenRouter
+- **Gemini**: 4 modelos incluyendo 2.0 Flash Experimental
+- **OpenRouter**: 8 modelos GRATUITOS (Llama 3.2, Phi-3, Gemma 2, etc.)
+- **Configuración Dinámica**: Cambio de modelo desde Telegram
 - **Fallbacks robustos**: Heurística local cuando falla cualquier proveedor de IA
 - **Intents soportados**: add, recur, listar, completar, ajustar_prefs, brief
 
-### Interfaz Interactiva
+### Interfaz Interactiva Avanzada
 
 - **Teclado principal**: Botones de acceso rápido
-- **Configuración de IA**: Cambio de proveedor y modelo desde Telegram
+- **Configuración de IA**: 12 modelos disponibles, cambio desde Telegram
+- **Brief Progresivo**: Muestra avance en tiempo real con contenido parcial
+- **Emails Mejorados**: Formato estructurado con razón de importancia
 - **Botones contextuales**: Acciones inline para tareas
 - **Paginación universal**: Mensajes largos divididos automáticamente
 
@@ -158,28 +162,36 @@ cp .env.example .env
 
 ### Configuración de Proveedores de IA
 
-#### Opción 1: Usar Gemini (Google)
+#### Opción 1: Usar Gemini (Google) - RECOMENDADO
 
 ```env
 AI_PROVIDER=gemini
 GEMINI_API_KEY=tu_api_key_de_gemini
 ```
 
-#### Opción 2: Usar OpenRouter
+**Modelos Gemini disponibles:**
+- `gemini-1.5-flash` - Rápido y eficiente (por defecto)
+- `gemini-1.5-pro` - Más potente y preciso
+- `gemini-2.0-flash-exp` - Última versión experimental
+- `gemini-exp-1206` - Versión experimental diciembre
+
+#### Opción 2: Usar OpenRouter (Solo Modelos Gratuitos)
 
 ```env
 AI_PROVIDER=openrouter
 OPENROUTER_API_KEY=tu_api_key_de_openrouter
-OPENROUTER_MODEL=gpt-4
+OPENROUTER_MODEL=meta-llama/llama-3.2-3b-instruct:free
 ```
 
-**Modelos soportados en OpenRouter:**
-
-- `gpt-4` - GPT-4 de OpenAI
-- `gpt-3.5-turbo` - GPT-3.5 Turbo
-- `claude-3-opus` - Claude 3 Opus de Anthropic
-- `claude-3-sonnet` - Claude 3 Sonnet
-- Y muchos más disponibles en [OpenRouter](https://openrouter.ai/)
+**Modelos GRATUITOS soportados en OpenRouter:**
+- `meta-llama/llama-3.2-3b-instruct:free` - Llama 3.2 3B
+- `meta-llama/llama-3.2-1b-instruct:free` - Llama 3.2 1B  
+- `microsoft/phi-3-mini-128k-instruct:free` - Phi-3 Mini
+- `microsoft/phi-3-medium-128k-instruct:free` - Phi-3 Medium
+- `google/gemma-2-9b-it:free` - Gemma 2 9B
+- `huggingface/zephyr-7b-beta:free` - Zephyr 7B
+- `openchat/openchat-7b:free` - OpenChat 7B
+- `gryphe/mythomist-7b:free` - Mythomist 7B
 
 4. **Configurar Google APIs**
 
