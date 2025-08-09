@@ -152,7 +152,15 @@ async def fetch_single_feed(url: str) -> List[Dict]:
     try:
         # Run feedparser in thread pool since it's blocking
         loop = asyncio.get_event_loop()
-        feed = await loop.run_in_executor(None, feedparser.parse, url)
+        feed = await asyncio.wait_for(
+            loop.run_in_executor(None, feedparser.parse, url),
+            timeout=10.0  # 10 second timeout per feed
+        )
+        
+        # Check if feed was parsed successfully
+        if not hasattr(feed, 'entries') or not feed.entries:
+            print(f"⚠️ No entries found in feed: {url}")
+            return []
         
         items = []
         for entry in feed.entries[:5]:  # Limit per feed to manage volume
@@ -164,8 +172,12 @@ async def fetch_single_feed(url: str) -> List[Dict]:
                 'source': feed.feed.get('title', 'Unknown')
             })
         
+        print(f"✅ Fetched {len(items)} items from {url}")
         return items
         
+    except asyncio.TimeoutError:
+        print(f"⏱️ Timeout fetching feed: {url}")
+        return []
     except Exception as e:
-        print(f"Error fetching feed {url}: {e}")
+        print(f"❌ Error fetching feed {url}: {e}")
         return []
