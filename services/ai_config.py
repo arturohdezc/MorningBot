@@ -8,16 +8,20 @@ AI_CONFIG_FILE = "ai_config.json"
 AVAILABLE_MODELS = {
     "gemini": [
         {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash", "description": "Rápido y eficiente"},
-        {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "description": "Más potente y preciso"}
+        {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "description": "Más potente y preciso"},
+        {"id": "gemini-2.0-flash-exp", "name": "Gemini 2.0 Flash (Experimental)", "description": "Última versión experimental"},
+        {"id": "gemini-exp-1206", "name": "Gemini Experimental 1206", "description": "Versión experimental diciembre"}
     ],
     "openrouter": [
-        {"id": "gpt-4", "name": "GPT-4", "description": "OpenAI GPT-4"},
-        {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo", "description": "OpenAI GPT-3.5 Turbo"},
-        {"id": "claude-3-opus", "name": "Claude 3 Opus", "description": "Anthropic Claude 3 Opus"},
-        {"id": "claude-3-sonnet", "name": "Claude 3 Sonnet", "description": "Anthropic Claude 3 Sonnet"},
-        {"id": "claude-3-haiku", "name": "Claude 3 Haiku", "description": "Anthropic Claude 3 Haiku"},
-        {"id": "llama-3-70b", "name": "Llama 3 70B", "description": "Meta Llama 3 70B"},
-        {"id": "mixtral-8x7b", "name": "Mixtral 8x7B", "description": "Mistral Mixtral 8x7B"}
+        # FREE MODELS
+        {"id": "meta-llama/llama-3.2-3b-instruct:free", "name": "Llama 3.2 3B (Free)", "description": "Meta Llama 3.2 3B - Gratis"},
+        {"id": "meta-llama/llama-3.2-1b-instruct:free", "name": "Llama 3.2 1B (Free)", "description": "Meta Llama 3.2 1B - Gratis"},
+        {"id": "microsoft/phi-3-mini-128k-instruct:free", "name": "Phi-3 Mini (Free)", "description": "Microsoft Phi-3 Mini - Gratis"},
+        {"id": "microsoft/phi-3-medium-128k-instruct:free", "name": "Phi-3 Medium (Free)", "description": "Microsoft Phi-3 Medium - Gratis"},
+        {"id": "google/gemma-2-9b-it:free", "name": "Gemma 2 9B (Free)", "description": "Google Gemma 2 9B - Gratis"},
+        {"id": "huggingface/zephyr-7b-beta:free", "name": "Zephyr 7B (Free)", "description": "HuggingFace Zephyr 7B - Gratis"},
+        {"id": "openchat/openchat-7b:free", "name": "OpenChat 7B (Free)", "description": "OpenChat 7B - Gratis"},
+        {"id": "gryphe/mythomist-7b:free", "name": "Mythomist 7B (Free)", "description": "Gryphe Mythomist 7B - Gratis"}
     ]
 }
 

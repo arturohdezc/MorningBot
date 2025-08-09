@@ -761,21 +761,52 @@ async def show_brief_progress(update: Update, context: ContextTypes.DEFAULT_TYPE
     message += f"{status_emoji(progress.calendar_completed)} Calendar\n"
     message += f"{status_emoji(progress.tasks_completed)} Tareas\n\n"
     
-    # Show partial results if available
+    # Show partial results with full sections if available
     if progress.news_completed and progress.news_data:
-        message += "🗞 **Noticias (Completado):**\n"
-        summary = progress.news_data.get('summary', '')[:200]
-        if len(progress.news_data.get('summary', '')) > 200:
-            summary += "..."
-        message += f"{summary}\n\n"
+        message += "🗞 **NOTICIAS (COMPLETADO):**\n"
+        news_summary = progress.news_data.get('summary', '')
+        # Show first 300 chars of news
+        if len(news_summary) > 300:
+            # Try to cut at a sentence or section break
+            cut_point = news_summary.find('\n', 250)
+            if cut_point == -1:
+                cut_point = 300
+            news_summary = news_summary[:cut_point] + "...\n\n[Continúa...]"
+        message += f"{news_summary}\n\n"
     
     if progress.emails_completed and progress.emails_data:
         emails = progress.emails_data.get('emails', [])
+        message += f"📧 **EMAILS (COMPLETADO):** {progress.emails_data.get('found', 0)} encontrados, {len(emails)} importantes\n"
         if emails:
-            message += f"📧 **Emails (Completado):** {len(emails)} importantes\n"
-            for email in emails[:2]:  # Show first 2
-                message += f"• {email.get('subject', 'Sin asunto')[:50]}...\n"
+            for i, email in enumerate(emails[:3], 1):  # Show first 3
+                sender = email.get('sender', 'Desconocido')
+                if '<' in sender:
+                    sender = sender.split('<')[0].strip()
+                message += f"{i}. **{email.get('subject', 'Sin asunto')[:40]}...**\n"
+                message += f"   👤 {sender}\n"
+            if len(emails) > 3:
+                message += f"   ... y {len(emails) - 3} más\n"
+        message += "\n"
+    
+    if progress.calendar_completed and progress.calendar_data:
+        message += f"📅 **CALENDARIO (COMPLETADO):** {len(progress.calendar_data)} eventos\n"
+        for event in progress.calendar_data[:3]:  # Show first 3
+            message += f"• {event.get('summary', 'Sin título')}"
+            if event.get('start'):
+                message += f" - {event['start']}"
             message += "\n"
+        if len(progress.calendar_data) > 3:
+            message += f"... y {len(progress.calendar_data) - 3} más\n"
+        message += "\n"
+    
+    if progress.tasks_completed and progress.tasks_data:
+        message += f"✅ **TAREAS (COMPLETADO):** {len(progress.tasks_data)} pendientes\n"
+        for task in progress.tasks_data[:3]:  # Show first 3
+            priority_emoji = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(task.get("priority", "medium"), "🟡")
+            message += f"• {priority_emoji} {task.get('title', 'Sin título')[:40]}...\n"
+        if len(progress.tasks_data) > 3:
+            message += f"... y {len(progress.tasks_data) - 3} más\n"
+        message += "\n"
     
     if progress.progress_percentage < 100:
         message += "🔄 **El brief continúa generándose en segundo plano.**\n"
