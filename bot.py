@@ -452,19 +452,67 @@ async def cmd_ia(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # Placeholder functions for existing commands (to be implemented later)
 async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Generate morning brief with immediate response and background processing"""
-    # Respond immediately to avoid Telegram timeout
-    await update.message.reply_text("📰 Generando brief matutino... ⏳")
+    """Generate morning brief with progressive loading system"""
+    user_id = update.effective_user.id
+    
+    # Import brief cache
+    from services.brief_cache import brief_cache
+    
+    # Check if we have a fresh brief
+    if brief_cache.is_brief_fresh(user_id, max_age_minutes=30):
+        logger.info(f"📰 Using cached brief for user {user_id}")
+        progress = brief_cache.get_progress(user_id)
+        brief_message = format_brief(
+            progress.news_data, 
+            progress.emails_data, 
+            progress.calendar_data, 
+            progress.tasks_data
+        )
+        brief_message += f"\n⚡ Brief desde caché (actualizado hace {int((datetime.now() - progress.last_updated).total_seconds() / 60)} min)"
+        
+        await send_paginated_message(
+            bot=context.bot,
+            chat_id=update.effective_chat.id,
+            content=brief_message,
+            parse_mode="Markdown",
+        )
+        return
+    
+    # Check if brief is currently generating
+    current_progress = brief_cache.get_progress(user_id)
+    if current_progress and current_progress.status == 'generating':
+        # Show current progress
+        await show_brief_progress(update, context, current_progress)
+        return
+    
+    # Start new brief generation
+    await update.message.reply_text("📰 Iniciando brief matutino... ⏳")
+    
+    # Start progress tracking
+    brief_cache.start_brief_generation(user_id)
+    
+    # Wait a few seconds to see if we can complete quickly
+    try:
+        await asyncio.wait_for(
+            generate_brief_progressive(update, context),
+            timeout=8.0  # 8 second initial timeout
+        )
+    except asyncio.TimeoutError:
+        # Show progress and continue in background
+        progress = brief_cache.get_progress(user_id)
+        await show_brief_progress(update, context, progress)
+        
+        # Continue in background
+        task = asyncio.create_task(continue_brief_background(update, context))
+        task.add_done_callback(lambda t: handle_task_exception(t, user_id))
 
-    # Process in background with shorter timeout
-    task = asyncio.create_task(generate_brief_background(update, context))
-
-    # Add error handling for the background task
-    def handle_task_exception(task):
-        if task.exception():
-            logger.error(f"❌ Background task failed: {task.exception()}")
-
-    task.add_done_callback(handle_task_exception)
+def handle_task_exception(task, user_id):
+    """Handle background task exceptions"""
+    if task.exception():
+        logger.error(f"❌ Background brief task failed for user {user_id}: {task.exception()}")
+        # Mark as failed in cache
+        from services.brief_cache import brief_cache
+        brief_cache.update_progress(user_id, status='failed')
 
 
 async def generate_brief_background(
@@ -568,6 +616,179 @@ async def generate_brief_background(
             )
         except Exception as send_error:
             logger.error(f"❌ Failed to send error message: {send_error}")
+
+
+async def generate_brief_progressive(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Generate brief progressively with cache updates"""
+    user_id = update.effective_user.id
+    from services.brief_cache import brief_cache
+    
+    logger.info(f"🔄 Starting progressive brief generation for user {user_id}")
+    
+    # Initialize with default values
+    news_data = {"summary": "📰 Cargando noticias...", "count": 0}
+    emails_data = {"found": 0, "considered": 0, "selected": 0, "emails": [], "rationale": "📧 Cargando emails..."}
+    calendar_data = []
+    tasks_data = []
+    
+    # Try each operation with progress updates
+    try:
+        logger.info("📰 Fetching news...")
+        news_data = await asyncio.wait_for(fetch_and_summarize_news(), timeout=25.0)
+        brief_cache.update_progress(user_id, news_data=news_data, news_completed=True)
+        logger.info("✅ News completed")
+    except Exception as e:
+        logger.error(f"❌ News failed: {e}")
+        news_data = {"summary": "📰 **Error** - No se pudieron obtener noticias", "count": 0}
+        brief_cache.update_progress(user_id, news_data=news_data, news_completed=True)
+    
+    try:
+        logger.info("📧 Fetching emails...")
+        emails_data = await asyncio.wait_for(fetch_and_rank_emails(), timeout=18.0)
+        brief_cache.update_progress(user_id, emails_data=emails_data, emails_completed=True)
+        logger.info("✅ Emails completed")
+    except Exception as e:
+        logger.error(f"❌ Emails failed: {e}")
+        emails_data = {"found": 0, "considered": 0, "selected": 0, "emails": [], "rationale": "📧 **Error** - No se pudieron obtener emails"}
+        brief_cache.update_progress(user_id, emails_data=emails_data, emails_completed=True)
+    
+    try:
+        logger.info("📅 Fetching calendar...")
+        calendar_data = await asyncio.wait_for(fetch_todays_events(), timeout=5.0)
+        brief_cache.update_progress(user_id, calendar_data=calendar_data, calendar_completed=True)
+        logger.info("✅ Calendar completed")
+    except Exception as e:
+        logger.error(f"❌ Calendar failed: {e}")
+        brief_cache.update_progress(user_id, calendar_data=[], calendar_completed=True)
+    
+    try:
+        logger.info("✅ Fetching tasks...")
+        tasks_data = await asyncio.wait_for(fetch_all_tasks(), timeout=3.0)
+        brief_cache.update_progress(user_id, tasks_data=tasks_data, tasks_completed=True)
+        logger.info("✅ Tasks completed")
+    except Exception as e:
+        logger.error(f"❌ Tasks failed: {e}")
+        brief_cache.update_progress(user_id, tasks_data=[], tasks_completed=True)
+    
+    # Send final brief
+    progress = brief_cache.get_progress(user_id)
+    brief_message = format_brief(
+        progress.news_data, 
+        progress.emails_data, 
+        progress.calendar_data, 
+        progress.tasks_data
+    )
+    
+    execution_time = (datetime.now() - progress.started_at).total_seconds()
+    brief_message += f"\n⏱ Generado en {execution_time:.1f}s"
+    
+    await send_paginated_message(
+        bot=context.bot,
+        chat_id=update.effective_chat.id,
+        content=brief_message,
+        parse_mode="Markdown",
+    )
+    
+    logger.info("✅ Progressive brief completed")
+
+
+async def continue_brief_background(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Continue brief generation in background"""
+    user_id = update.effective_user.id
+    from services.brief_cache import brief_cache
+    
+    logger.info(f"🔄 Continuing brief generation in background for user {user_id}")
+    
+    progress = brief_cache.get_progress(user_id)
+    if not progress:
+        return
+    
+    # Continue with remaining operations
+    if not progress.news_completed:
+        try:
+            news_data = await asyncio.wait_for(fetch_and_summarize_news(), timeout=25.0)
+            brief_cache.update_progress(user_id, news_data=news_data, news_completed=True)
+        except Exception as e:
+            logger.error(f"❌ Background news failed: {e}")
+            news_data = {"summary": "📰 **Error** - No se pudieron obtener noticias", "count": 0}
+            brief_cache.update_progress(user_id, news_data=news_data, news_completed=True)
+    
+    if not progress.emails_completed:
+        try:
+            emails_data = await asyncio.wait_for(fetch_and_rank_emails(), timeout=18.0)
+            brief_cache.update_progress(user_id, emails_data=emails_data, emails_completed=True)
+        except Exception as e:
+            logger.error(f"❌ Background emails failed: {e}")
+            emails_data = {"found": 0, "considered": 0, "selected": 0, "emails": [], "rationale": "📧 **Error** - No se pudieron obtener emails"}
+            brief_cache.update_progress(user_id, emails_data=emails_data, emails_completed=True)
+    
+    if not progress.calendar_completed:
+        try:
+            calendar_data = await asyncio.wait_for(fetch_todays_events(), timeout=5.0)
+            brief_cache.update_progress(user_id, calendar_data=calendar_data, calendar_completed=True)
+        except Exception as e:
+            logger.error(f"❌ Background calendar failed: {e}")
+            brief_cache.update_progress(user_id, calendar_data=[], calendar_completed=True)
+    
+    if not progress.tasks_completed:
+        try:
+            tasks_data = await asyncio.wait_for(fetch_all_tasks(), timeout=3.0)
+            brief_cache.update_progress(user_id, tasks_data=tasks_data, tasks_completed=True)
+        except Exception as e:
+            logger.error(f"❌ Background tasks failed: {e}")
+            brief_cache.update_progress(user_id, tasks_data=[], tasks_completed=True)
+    
+    logger.info("✅ Background brief generation completed")
+
+
+async def show_brief_progress(update: Update, context: ContextTypes.DEFAULT_TYPE, progress) -> None:
+    """Show current brief generation progress"""
+    if not progress:
+        await update.message.reply_text("❌ No se encontró progreso del brief")
+        return
+    
+    # Build progress message
+    message = "📊 **Brief en Progreso**\n\n"
+    message += f"⏱ **Progreso:** {progress.progress_percentage}%\n"
+    
+    elapsed = (datetime.now() - progress.started_at).total_seconds()
+    message += f"🕐 **Tiempo transcurrido:** {elapsed:.1f}s\n\n"
+    
+    # Show what's completed
+    status_emoji = lambda completed: "✅" if completed else "⏳"
+    message += f"{status_emoji(progress.news_completed)} Noticias\n"
+    message += f"{status_emoji(progress.emails_completed)} Emails\n"
+    message += f"{status_emoji(progress.calendar_completed)} Calendar\n"
+    message += f"{status_emoji(progress.tasks_completed)} Tareas\n\n"
+    
+    # Show partial results if available
+    if progress.news_completed and progress.news_data:
+        message += "🗞 **Noticias (Completado):**\n"
+        summary = progress.news_data.get('summary', '')[:200]
+        if len(progress.news_data.get('summary', '')) > 200:
+            summary += "..."
+        message += f"{summary}\n\n"
+    
+    if progress.emails_completed and progress.emails_data:
+        emails = progress.emails_data.get('emails', [])
+        if emails:
+            message += f"📧 **Emails (Completado):** {len(emails)} importantes\n"
+            for email in emails[:2]:  # Show first 2
+                message += f"• {email.get('subject', 'Sin asunto')[:50]}...\n"
+            message += "\n"
+    
+    if progress.progress_percentage < 100:
+        message += "🔄 **El brief continúa generándose en segundo plano.**\n"
+        message += "💡 **Vuelve a pedir /brief en unos segundos para ver la versión completa.**"
+    else:
+        message += "✅ **Brief completado! Pide /brief para ver la versión final.**"
+    
+    await send_paginated_message(
+        bot=context.bot,
+        chat_id=update.effective_chat.id,
+        content=message,
+        parse_mode="Markdown",
+    )
 
 
 async def fetch_and_summarize_news() -> Dict:

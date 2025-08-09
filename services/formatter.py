@@ -150,15 +150,35 @@ def format_brief(news_data: dict = None, emails_data: dict = None, calendar_data
         message += "\n"
         
         if emails_data.get('emails'):
-            for email in emails_data['emails'][:5]:  # Limit to 5
-                message += f"• {email.get('subject', 'Sin asunto')}\n"
-                message += f"  De: {email.get('sender', 'Desconocido')}"
+            for i, email in enumerate(emails_data['emails'][:5], 1):  # Limit to 5
+                # Extract sender name (remove email part)
+                sender = email.get('sender', 'Desconocido')
+                if '<' in sender:
+                    sender_name = sender.split('<')[0].strip()
+                    if sender_name:
+                        sender = sender_name
+                
+                message += f"**{i}. {email.get('subject', 'Sin asunto')}**\n"
+                message += f"👤 **De:** {sender}"
                 
                 # Show account if multi-account
                 if email.get('account') and email['account'] != 'me':
-                    message += f" ({email['account']})"
+                    account_short = email['account'].split('@')[0] if '@' in email['account'] else email['account']
+                    message += f" ({account_short})"
                 
-                message += "\n\n"
+                message += "\n"
+                
+                # Add importance reason if available
+                if email.get('importance_reason'):
+                    message += f"💡 **Por qué es importante:** {email['importance_reason']}\n"
+                elif email.get('body'):
+                    # Show first 100 chars of body as preview
+                    body_preview = email['body'][:100].replace('\n', ' ').strip()
+                    if len(email['body']) > 100:
+                        body_preview += "..."
+                    message += f"📄 **Resumen:** {body_preview}\n"
+                
+                message += "\n"
     
     # Calendar section
     if calendar_data:
