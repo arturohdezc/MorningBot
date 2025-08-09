@@ -71,61 +71,40 @@ async def fetch_news_from_rss(rss_urls: List[str]) -> List[Dict]:
     """
     news_items = []
     
-    # Comprehensive RSS feeds - Economy, General News, AI, Travel (Mexico, US, World)
+    # Reliable RSS feeds - Start with most reliable ones
     if not rss_urls:
         rss_urls = [
+            # === MOST RELIABLE FEEDS ===
+            "https://feeds.bbci.co.uk/news/rss.xml",  # BBC News
+            "https://feeds.reuters.com/reuters/topNews",  # Reuters
+            "https://rss.cnn.com/rss/edition.rss",  # CNN
+            
             # === ECONOMÍA ===
-            # Economía México
-            "https://www.eleconomista.com.mx/rss/economia.xml",
-            "https://www.elfinanciero.com.mx/rss/economia/",
-            "https://feeds.feedburner.com/ElUniversalMexicoEconomia",
+            "https://feeds.reuters.com/reuters/businessNews",  # Reuters Business
+            "https://feeds.bbci.co.uk/news/business/rss.xml",  # BBC Business
+            "https://rss.cnn.com/rss/money_latest.rss",  # CNN Money
             
-            # Economía US
-            "https://feeds.reuters.com/reuters/businessNews",
-            "https://rss.cnn.com/rss/money_latest.rss",
-            "https://feeds.bloomberg.com/markets/news.rss",
-            "https://feeds.marketwatch.com/marketwatch/topstories/",
+            # === TECH/AI ===
+            "https://techcrunch.com/feed/",  # TechCrunch
+            "https://feeds.feedburner.com/venturebeat/SZYF",  # VentureBeat
             
-            # Economía Mundial
-            "https://feeds.reuters.com/reuters/globalMarketsNews",
-            "https://feeds.bbci.co.uk/news/business/rss.xml",
-            "https://www.ft.com/rss/home/global-economy",
-            
-            # === NOTICIAS GENERALES ===
-            # México General
-            "https://www.eluniversal.com.mx/rss.xml",
-            "https://www.milenio.com/rss/milenio.xml",
-            "https://feeds.feedburner.com/Reformacom-Nacional",
-            "https://www.jornada.com.mx/rss/edicion.xml",
-            "https://www.excelsior.com.mx/rss.xml",
-            
-            # US General
-            "https://rss.cnn.com/rss/edition.rss",
-            "https://feeds.reuters.com/reuters/topNews",
-            "https://feeds.washingtonpost.com/rss/national",
-            "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
-            
-            # Mundial General
-            "https://feeds.bbci.co.uk/news/rss.xml",
-            "https://feeds.reuters.com/reuters/worldNews",
-            "https://feeds.ap.org/ap/general",
-            
-            # === INTELIGENCIA ARTIFICIAL ===
-            "https://feeds.feedburner.com/oreilly/radar/ai",
-            "https://feeds.feedburner.com/venturebeat/SZYF",
-            "https://techcrunch.com/category/artificial-intelligence/feed/",
-            "https://www.artificialintelligence-news.com/feed/",
-            "https://feeds.feedburner.com/TheAiReport",
+            # === MÉXICO ===
+            "https://www.eluniversal.com.mx/rss.xml",  # El Universal
+            "https://www.milenio.com/rss/milenio.xml",  # Milenio
             
             # === VIAJES ===
-            "https://feeds.feedburner.com/lonelyplanet/news",
-            "https://feeds.feedburner.com/NatGeoTravelNews",
-            "https://rss.cnn.com/rss/travel.rss",
-            "https://feeds.skift.com/skift",
-            "https://www.travelandleisure.com/syndication/feed"
+            "https://rss.cnn.com/rss/travel.rss",  # CNN Travel
+            
+            # === BACKUP FEEDS (if above work) ===
+            "https://feeds.reuters.com/reuters/worldNews",
+            "https://www.eleconomista.com.mx/rss/economia.xml",
+            "https://feeds.ap.org/ap/general",
+            "https://techcrunch.com/category/artificial-intelligence/feed/",
         ]
     
     try:
+        print(f"📰 Starting to fetch {len(rss_urls)} RSS feeds")
+        
         # Fetch feeds in parallel
         tasks = []
         for url in rss_urls:
@@ -133,14 +112,26 @@ async def fetch_news_from_rss(rss_urls: List[str]) -> List[Dict]:
         
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        for result in results:
+        successful_feeds = 0
+        failed_feeds = 0
+        
+        for i, result in enumerate(results):
             if isinstance(result, list):
                 news_items.extend(result)
+                if result:
+                    successful_feeds += 1
+                    print(f"✅ Feed {i+1}: {len(result)} items")
+                else:
+                    print(f"⚠️ Feed {i+1}: 0 items")
             elif isinstance(result, Exception):
-                print(f"Error fetching RSS feed: {result}")
+                failed_feeds += 1
+                print(f"❌ Feed {i+1} failed: {result}")
+        
+        print(f"📊 RSS Summary: {successful_feeds} successful, {failed_feeds} failed, {len(news_items)} total items")
         
         # Organize and limit news items
         organized_news = organize_news_by_category(news_items)
+        print(f"📋 Organized news: {len(organized_news)} items after categorization")
         return organized_news[:30]  # Increased limit for comprehensive coverage
         
     except Exception as e:
@@ -162,6 +153,10 @@ async def fetch_single_feed(url: str) -> List[Dict]:
             print(f"⚠️ No entries found in feed: {url}")
             return []
         
+        # Check for feed errors
+        if hasattr(feed, 'bozo') and feed.bozo:
+            print(f"⚠️ Feed parsing warning for {url}: {getattr(feed, 'bozo_exception', 'Unknown error')}")
+        
         items = []
         for entry in feed.entries[:5]:  # Limit per feed to manage volume
             items.append({
@@ -172,7 +167,7 @@ async def fetch_single_feed(url: str) -> List[Dict]:
                 'source': feed.feed.get('title', 'Unknown')
             })
         
-        print(f"✅ Fetched {len(items)} items from {url}")
+        print(f"✅ Fetched {len(items)} items from {url[:50]}...")
         return items
         
     except asyncio.TimeoutError:
