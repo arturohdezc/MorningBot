@@ -682,11 +682,17 @@ async def generate_brief_progressive(update: Update, context: ContextTypes.DEFAU
     execution_time = (datetime.now() - progress.started_at).total_seconds()
     brief_message += f"\n⏱ Generado en {execution_time:.1f}s"
     
+    # Add regenerate button
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = [[InlineKeyboardButton("🔄 Regenerar Brief", callback_data="regenerate_brief")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await send_paginated_message(
         bot=context.bot,
         chat_id=update.effective_chat.id,
         content=brief_message,
         parse_mode="Markdown",
+        reply_markup=reply_markup
     )
     
     logger.info("✅ Progressive brief completed")
@@ -761,52 +767,7 @@ async def show_brief_progress(update: Update, context: ContextTypes.DEFAULT_TYPE
     message += f"{status_emoji(progress.calendar_completed)} Calendar\n"
     message += f"{status_emoji(progress.tasks_completed)} Tareas\n\n"
     
-    # Show partial results with full sections if available
-    if progress.news_completed and progress.news_data:
-        message += "🗞 **NOTICIAS (COMPLETADO):**\n"
-        news_summary = progress.news_data.get('summary', '')
-        # Show first 300 chars of news
-        if len(news_summary) > 300:
-            # Try to cut at a sentence or section break
-            cut_point = news_summary.find('\n', 250)
-            if cut_point == -1:
-                cut_point = 300
-            news_summary = news_summary[:cut_point] + "...\n\n[Continúa...]"
-        message += f"{news_summary}\n\n"
-    
-    if progress.emails_completed and progress.emails_data:
-        emails = progress.emails_data.get('emails', [])
-        message += f"📧 **EMAILS (COMPLETADO):** {progress.emails_data.get('found', 0)} encontrados, {len(emails)} importantes\n"
-        if emails:
-            for i, email in enumerate(emails[:3], 1):  # Show first 3
-                sender = email.get('sender', 'Desconocido')
-                if '<' in sender:
-                    sender = sender.split('<')[0].strip()
-                message += f"{i}. **{email.get('subject', 'Sin asunto')[:40]}...**\n"
-                message += f"   👤 {sender}\n"
-            if len(emails) > 3:
-                message += f"   ... y {len(emails) - 3} más\n"
-        message += "\n"
-    
-    if progress.calendar_completed and progress.calendar_data:
-        message += f"📅 **CALENDARIO (COMPLETADO):** {len(progress.calendar_data)} eventos\n"
-        for event in progress.calendar_data[:3]:  # Show first 3
-            message += f"• {event.get('summary', 'Sin título')}"
-            if event.get('start'):
-                message += f" - {event['start']}"
-            message += "\n"
-        if len(progress.calendar_data) > 3:
-            message += f"... y {len(progress.calendar_data) - 3} más\n"
-        message += "\n"
-    
-    if progress.tasks_completed and progress.tasks_data:
-        message += f"✅ **TAREAS (COMPLETADO):** {len(progress.tasks_data)} pendientes\n"
-        for task in progress.tasks_data[:3]:  # Show first 3
-            priority_emoji = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(task.get("priority", "medium"), "🟡")
-            message += f"• {priority_emoji} {task.get('title', 'Sin título')[:40]}...\n"
-        if len(progress.tasks_data) > 3:
-            message += f"... y {len(progress.tasks_data) - 3} más\n"
-        message += "\n"
+    # No mostrar contenido parcial, solo status
     
     if progress.progress_percentage < 100:
         message += "🔄 **El brief continúa generándose en segundo plano.**\n"
@@ -977,7 +938,7 @@ async def cmd_prefs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_ajusta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Adjust preferences using natural language"""
+    """Adjust preferences using natural language with AI"""
     if not context.args:
         await update.message.reply_text(
             "❌ Uso: /ajusta <instrucción>\nEjemplo: /ajusta ya no me des correos de oracle"
@@ -987,11 +948,23 @@ async def cmd_ajusta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     instruction = " ".join(context.args)
 
     try:
-        updated_prefs = update_prefs_from_instruction(instruction)
+        from services.prefs import update_prefs_from_instruction
+        updated_prefs = await update_prefs_from_instruction(instruction)
+        
+        explanation = updated_prefs.get('_ai_explanation', 'Preferencias actualizadas')
+        
+        # Add button to regenerate brief
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        keyboard = [[InlineKeyboardButton("🔄 Regenerar Brief con Nuevos Filtros", callback_data="regenerate_brief")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         await update.message.reply_text(
-            f"✅ Preferencias actualizadas:\n\n"
-            f"Instrucción: {instruction}\n\n"
-            f"Cambios aplicados. Usa /prefs para ver el estado actual."
+            f"✅ **Preferencias actualizadas**\n\n"
+            f"**Instrucción:** {instruction}\n\n"
+            f"**Cambios:** {explanation}\n\n"
+            f"Usa /prefs para ver el estado actual.",
+            parse_mode="Markdown",
+            reply_markup=reply_markup
         )
     except Exception as e:
         logger.error(f"Error in cmd_ajusta: {e}")
@@ -1286,6 +1259,21 @@ async def handle_inline_button(
 
     elif query.data == "ai_config_back":
         await show_ai_config_menu(update, context, edit=True)
+    
+    elif query.data == "regenerate_brief":
+        # Clear cache and regenerate brief
+        user_id = update.effective_user.id
+        from services.brief_cache import brief_cache
+        
+        # Remove from cache to force regeneration
+        if user_id in brief_cache.cache:
+            del brief_cache.cache[user_id]
+            brief_cache.save_cache()
+        
+        await query.edit_message_text("🔄 Regenerando brief...")
+        
+        # Start new brief generation
+        await cmd_brief(update, context)
 
 
 async def main() -> None:

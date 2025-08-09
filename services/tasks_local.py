@@ -10,8 +10,20 @@ import pytz
 TASKS_DB_FILE = "tasks_db.json"
 
 def generate_task_id() -> str:
-    """Generate a short UUID for task ID"""
-    return f"t_{str(uuid.uuid4())[:8]}"
+    """Generate a human-friendly task ID"""
+    import random
+    import string
+    
+    # Generate a short, readable ID like T001, T002, etc.
+    tasks_data = load_tasks()
+    existing_ids = [task.get('id', '') for task in tasks_data.get('tasks', [])]
+    
+    # Find next available number
+    counter = 1
+    while f"T{counter:03d}" in existing_ids:
+        counter += 1
+    
+    return f"T{counter:03d}"
 
 def load_tasks() -> Dict:
     """Load tasks from JSON file"""

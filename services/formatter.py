@@ -180,17 +180,18 @@ def format_brief(news_data: dict = None, emails_data: dict = None, calendar_data
                 
                 message += "\n"
     
-    # Calendar section
-    if calendar_data:
-        message += "📅 *Eventos de Hoy*\n"
-        if calendar_data:
-            for event in calendar_data[:5]:  # Limit to 5
-                message += f"• {event.get('summary', 'Sin título')}\n"
-                if event.get('start'):
-                    message += f"  {event['start']}\n"
-                message += "\n"
-        else:
-            message += "No hay eventos programados\n\n"
+    # Calendar section - Always show
+    message += "📅 *Eventos de Hoy*\n"
+    if calendar_data and len(calendar_data) > 0:
+        for event in calendar_data[:5]:  # Limit to 5
+            message += f"• {event.get('summary', 'Sin título')}\n"
+            if event.get('start'):
+                message += f"  {event['start']}\n"
+            if event.get('location'):
+                message += f"  📍 {event['location']}\n"
+            message += "\n"
+    else:
+        message += "No hay eventos programados para hoy\n\n"
     
     # Tasks section
     if tasks_data:
