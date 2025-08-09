@@ -69,6 +69,7 @@ def load_account_credentials() -> Dict[str, Credentials]:
         print(f"⚠️ No multi-account tokens found in environment or file")
         return {}
 
+    try:
         print(f"🔍 Found {len(tokens_data)} accounts in tokens file")
 
         for account_email, token_data in tokens_data.items():
