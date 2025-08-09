@@ -406,14 +406,18 @@ async def generate_brief_background(update: Update, context: ContextTypes.DEFAUL
             news_data = await asyncio.wait_for(fetch_and_summarize_news(), timeout=5.0)
             logger.info("✅ News fetched successfully")
         except Exception as e:
+            import traceback
             logger.error(f"❌ News fetch failed: {e}")
+            logger.error(f"📋 News traceback: {traceback.format_exc()}")
         
         try:
             logger.info("📧 Fetching emails...")
             emails_data = await asyncio.wait_for(fetch_and_rank_emails(), timeout=8.0)
             logger.info("✅ Emails fetched successfully")
         except Exception as e:
+            import traceback
             logger.error(f"❌ Email fetch failed: {e}")
+            logger.error(f"📋 Email traceback: {traceback.format_exc()}")
         
         try:
             logger.info("📅 Fetching calendar...")
@@ -471,9 +475,22 @@ async def fetch_and_summarize_news() -> Dict:
         news_items = await fetch_news_from_rss(rss_urls)
         logger.info(f"📰 Found {len(news_items)} news items")
         
+        if not news_items:
+            logger.warning("📰 No news items found, using fallback")
+            return {
+                "summary": "📰 **Noticias no disponibles** - Error al obtener feeds RSS",
+                "count": 0
+            }
+        
         logger.info("🤖 Summarizing news with AI")
-        summary = await summarize_news_list(news_items)
-        logger.info("✅ News summary completed")
+        try:
+            summary = await summarize_news_list(news_items)
+            logger.info("✅ News summary completed")
+        except Exception as ai_error:
+            logger.warning(f"🤖 AI summarization failed: {ai_error}, using fallback")
+            # Use fallback summarization
+            from services.ai_fallbacks import fallback_summarize_news
+            summary = await fallback_summarize_news(news_items)
         
         return {
             "summary": summary,
@@ -481,7 +498,10 @@ async def fetch_and_summarize_news() -> Dict:
         }
     except Exception as e:
         logger.error(f"❌ Error in fetch_and_summarize_news: {e}")
-        return {"summary": "Error al obtener noticias", "count": 0}
+        return {
+            "summary": "📰 **Error al obtener noticias** - Servicio temporalmente no disponible",
+            "count": 0
+        }
 
 async def fetch_and_rank_emails() -> Dict:
     """Fetch and rank emails with timeout"""
@@ -491,15 +511,31 @@ async def fetch_and_rank_emails() -> Dict:
         emails = await fetch_yesterdays_emails()
         logger.info(f"📧 Found {len(emails)} emails")
         
+        if not emails:
+            logger.warning("📧 No emails found")
+            return {
+                "found": 0,
+                "considered": 0,
+                "selected": 0,
+                "emails": [],
+                "rationale": "📧 **No hay correos de ayer** - Verifica configuración de Gmail"
+            }
+        
         # Pre-filter by preferences
         logger.info("🔍 Pre-filtering emails by preferences")
         filtered_emails, original_count = prefilter_by_prefs(emails)
         logger.info(f"🔍 Filtered to {len(filtered_emails)} emails from {original_count} total")
         
-        # Rank with Gemini
+        # Rank with AI or fallback
         logger.info("🤖 Ranking emails with AI")
-        ranked_result = await rank_emails_with_gemini(filtered_emails, top_k=10)
-        logger.info(f"✅ Email ranking completed, selected {ranked_result.get('selected', 0)} emails")
+        try:
+            ranked_result = await rank_emails_with_gemini(filtered_emails, top_k=10)
+            logger.info(f"✅ Email ranking completed, selected {ranked_result.get('selected', 0)} emails")
+        except Exception as ai_error:
+            logger.warning(f"🤖 AI ranking failed: {ai_error}, using fallback")
+            # Use fallback ranking
+            from services.ai_fallbacks import fallback_rank_emails
+            ranked_result = await fallback_rank_emails(filtered_emails, top_k=10)
         
         # Add original count
         ranked_result["found"] = original_count
@@ -513,7 +549,7 @@ async def fetch_and_rank_emails() -> Dict:
             "considered": 0,
             "selected": 0,
             "emails": [],
-            "rationale": "Error al procesar correos"
+            "rationale": "📧 **Error al procesar correos** - Servicio temporalmente no disponible"
         }
 
 async def fetch_all_tasks() -> List[Dict]:
