@@ -61,7 +61,7 @@ def organize_news_by_category(news_items: List[Dict]) -> List[Dict]:
 
 async def fetch_news_from_rss(rss_urls: List[str]) -> List[Dict]:
     """
-    Fetch news from RSS feeds
+    Fetch news from RSS feeds with optimized timeouts for Render
     
     Args:
         rss_urls: List of RSS feed URLs
@@ -71,35 +71,26 @@ async def fetch_news_from_rss(rss_urls: List[str]) -> List[Dict]:
     """
     news_items = []
     
-    # Reliable RSS feeds - Start with most reliable ones
+    # Optimized RSS feeds - Focus on most reliable ones for Render
     if not rss_urls:
         rss_urls = [
-            # === MOST RELIABLE FEEDS ===
-            "https://feeds.bbci.co.uk/news/rss.xml",  # BBC News
-            "https://feeds.reuters.com/reuters/topNews",  # Reuters
-            "https://rss.cnn.com/rss/edition.rss",  # CNN
+            # === TIER 1: MOST RELIABLE (always work) ===
+            "https://techcrunch.com/feed/",  # TechCrunch - most reliable
+            "https://feeds.feedburner.com/oreilly/radar",  # O'Reilly Radar
+            "https://www.wired.com/feed/rss",  # Wired
             
-            # === ECONOMÍA ===
+            # === TIER 2: USUALLY RELIABLE ===
+            "https://feeds.bbci.co.uk/news/rss.xml",  # BBC News
+            "https://rss.cnn.com/rss/edition.rss",  # CNN
+            "https://feeds.reuters.com/reuters/topNews",  # Reuters
+            
+            # === TIER 3: BUSINESS/ECONOMY ===
             "https://feeds.reuters.com/reuters/businessNews",  # Reuters Business
-            "https://feeds.bbci.co.uk/news/business/rss.xml",  # BBC Business
             "https://rss.cnn.com/rss/money_latest.rss",  # CNN Money
             
-            # === TECH/AI ===
-            "https://techcrunch.com/feed/",  # TechCrunch
-            "https://feeds.feedburner.com/venturebeat/SZYF",  # VentureBeat
-            
-            # === MÉXICO ===
+            # === TIER 4: REGIONAL (if time permits) ===
             "https://www.eluniversal.com.mx/rss.xml",  # El Universal
-            "https://www.milenio.com/rss/milenio.xml",  # Milenio
-            
-            # === VIAJES ===
-            "https://rss.cnn.com/rss/travel.rss",  # CNN Travel
-            
-            # === BACKUP FEEDS (if above work) ===
-            "https://feeds.reuters.com/reuters/worldNews",
-            "https://www.eleconomista.com.mx/rss/economia.xml",
-            "https://feeds.ap.org/ap/general",
-            "https://techcrunch.com/category/artificial-intelligence/feed/",
+            "https://feeds.ap.org/ap/general",  # AP News
         ]
     
     try:
@@ -139,13 +130,13 @@ async def fetch_news_from_rss(rss_urls: List[str]) -> List[Dict]:
         return []
 
 async def fetch_single_feed(url: str) -> List[Dict]:
-    """Fetch a single RSS feed"""
+    """Fetch a single RSS feed with optimized timeout for Render"""
     try:
         # Run feedparser in thread pool since it's blocking
         loop = asyncio.get_event_loop()
         feed = await asyncio.wait_for(
             loop.run_in_executor(None, feedparser.parse, url),
-            timeout=5.0  # 5 second timeout per feed
+            timeout=8.0  # Increased to 8 seconds for Render's slower network
         )
         
         # Check if feed was parsed successfully

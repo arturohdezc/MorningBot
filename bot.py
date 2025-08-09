@@ -490,38 +490,48 @@ async def generate_brief_background(
         calendar_data = []
         tasks_data = []
 
-        # Try each operation individually with error handling
+        # Try each operation individually with optimized timeouts for Render
         try:
             logger.info("📰 Fetching news...")
-            news_data = await asyncio.wait_for(fetch_and_summarize_news(), timeout=15.0)
+            news_data = await asyncio.wait_for(fetch_and_summarize_news(), timeout=25.0)  # Increased for news
             logger.info("✅ News fetched successfully")
+        except asyncio.TimeoutError:
+            logger.error("⏱️ News fetch timeout")
+            news_data = {"summary": "📰 **Timeout** - Red lenta obteniendo noticias", "count": 0}
         except Exception as e:
             import traceback
-
             logger.error(f"❌ News fetch failed: {e}")
             logger.error(f"📋 News traceback: {traceback.format_exc()}")
 
         try:
             logger.info("📧 Fetching emails...")
-            emails_data = await asyncio.wait_for(fetch_and_rank_emails(), timeout=15.0)
+            emails_data = await asyncio.wait_for(fetch_and_rank_emails(), timeout=18.0)  # Increased for emails
             logger.info("✅ Emails fetched successfully")
+        except asyncio.TimeoutError:
+            logger.error("⏱️ Email fetch timeout")
+            emails_data = {"found": 0, "considered": 0, "selected": 0, "emails": [], "rationale": "📧 **Timeout** - Red lenta accediendo Gmail"}
         except Exception as e:
             import traceback
-
             logger.error(f"❌ Email fetch failed: {e}")
             logger.error(f"📋 Email traceback: {traceback.format_exc()}")
 
         try:
             logger.info("📅 Fetching calendar...")
-            calendar_data = await asyncio.wait_for(fetch_todays_events(), timeout=3.0)
+            calendar_data = await asyncio.wait_for(fetch_todays_events(), timeout=5.0)  # Increased slightly
             logger.info("✅ Calendar fetched successfully")
+        except asyncio.TimeoutError:
+            logger.error("⏱️ Calendar fetch timeout")
+            calendar_data = []
         except Exception as e:
             logger.error(f"❌ Calendar fetch failed: {e}")
 
         try:
             logger.info("✅ Fetching tasks...")
-            tasks_data = await asyncio.wait_for(fetch_all_tasks(), timeout=2.0)
+            tasks_data = await asyncio.wait_for(fetch_all_tasks(), timeout=3.0)  # Increased slightly
             logger.info("✅ Tasks fetched successfully")
+        except asyncio.TimeoutError:
+            logger.error("⏱️ Tasks fetch timeout")
+            tasks_data = []
         except Exception as e:
             logger.error(f"❌ Tasks fetch failed: {e}")
 
@@ -561,12 +571,17 @@ async def generate_brief_background(
 
 
 async def fetch_and_summarize_news() -> Dict:
-    """Fetch news and summarize with timeout"""
+    """Fetch news and summarize with timeout optimized for Render"""
     try:
         logger.info("📰 Fetching news from RSS feeds")
         # Use default RSS feeds
         rss_urls = []  # Will use defaults in fetch_news_from_rss
-        news_items = await fetch_news_from_rss(rss_urls)
+        
+        # Add timeout for entire news operation
+        news_items = await asyncio.wait_for(
+            fetch_news_from_rss(rss_urls), 
+            timeout=20.0  # Increased timeout for Render
+        )
         logger.info(f"📰 Found {len(news_items)} news items")
 
         if not news_items:
@@ -578,16 +593,29 @@ async def fetch_and_summarize_news() -> Dict:
 
         logger.info("🤖 Summarizing news with AI")
         try:
-            summary = await summarize_news_list(news_items)
+            # Add timeout for AI summarization
+            summary = await asyncio.wait_for(
+                summarize_news_list(news_items),
+                timeout=10.0  # 10 seconds for AI processing
+            )
             logger.info("✅ News summary completed")
+        except asyncio.TimeoutError:
+            logger.warning("🤖 AI summarization timeout, using fallback")
+            from services.ai_fallbacks import fallback_summarize_news
+            summary = await fallback_summarize_news(news_items)
         except Exception as ai_error:
             logger.warning(f"🤖 AI summarization failed: {ai_error}, using fallback")
             # Use fallback summarization
             from services.ai_fallbacks import fallback_summarize_news
-
             summary = await fallback_summarize_news(news_items)
 
         return {"summary": summary, "count": len(news_items)}
+    except asyncio.TimeoutError:
+        logger.error("⏱️ News fetch timeout - using fallback")
+        return {
+            "summary": "📰 **Timeout obteniendo noticias** - Red lenta, intenta más tarde",
+            "count": 0,
+        }
     except Exception as e:
         logger.error(f"❌ Error in fetch_and_summarize_news: {e}")
         return {

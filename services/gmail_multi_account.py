@@ -348,11 +348,11 @@ async def fetch_all_accounts_emails() -> List[Dict]:
         for account_email in TARGET_ACCOUNTS:
             tasks.append(fetch_emails_from_specific_account(account_email))
 
-        # Execute in parallel with timeout
+        # Execute in parallel with timeout optimized for Render
         try:
             results = await asyncio.wait_for(
                 asyncio.gather(*tasks, return_exceptions=True),
-                timeout=12.0,  # 12 second timeout for all accounts
+                timeout=15.0,  # Increased to 15 seconds for Render's slower network
             )
         except asyncio.TimeoutError:
             print("⏱️ Gmail fetch timeout - using partial results")

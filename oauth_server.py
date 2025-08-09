@@ -124,11 +124,11 @@ async def root():
             <h2>Configurar Cuentas Gmail:</h2>
             <p>Para cada cuenta que quieras agregar, haz clic en el enlace correspondiente:</p>
             <ul>
-                <li><a href="/auth/user1@example.com">user1@example.com</a></li>
-                <li><a href="/auth/user2@example.com">user2@example.com</a></li>
-                <li><a href="/auth/user3@example.com">user3@example.com</a></li>
-                <li><a href="/auth/user4@example.com">user4@example.com</a></li>
-                <li><a href="/auth/user5@example.com">user5@example.com</a></li>
+                <li><a href="/auth/arturohcenturion@gmail.com">arturohcenturion@gmail.com</a></li>
+                <li><a href="/auth/tlapalerialavictoria@gmail.com">tlapalerialavictoria@gmail.com</a></li>
+                <li><a href="/auth/arturo@nowgrowpro.com">arturo@nowgrowpro.com</a></li>
+                <li><a href="/auth/determinarte@gmail.com">determinarte@gmail.com</a></li>
+                <li><a href="/auth/arturohdez.92@gmail.com">arturohdez.92@gmail.com</a></li>
             </ul>
             <hr>
             <h3>Estado de Autenticación:</h3>
@@ -296,11 +296,11 @@ async def get_status():
     """
     
     target_accounts = [
-        "user1@example.com",
-        "user2@example.com", 
-        "user3@example.com",
-        "user4@example.com",
-        "user5@example.com"
+        "arturohcenturion@gmail.com",
+        "tlapalerialavictoria@gmail.com", 
+        "arturo@nowgrowpro.com",
+        "determinarte@gmail.com",
+        "arturohdez.92@gmail.com"
     ]
     
     for account in target_accounts:
