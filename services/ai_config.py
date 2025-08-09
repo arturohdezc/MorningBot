@@ -55,6 +55,9 @@ AVAILABLE_MODELS = {
             "name": "Gemma 3n 2B (Free)",
             "description": "Google Gemma 3n 2B - Gratis",
         },
+        {
+            "id": "huggingfaceh4/zephyr-7b-beta:free",
+            "name": "Zephyr 7B Beta (Free)",
             "description": "HuggingFace Zephyr 7B - Gratis",
         },
         {
