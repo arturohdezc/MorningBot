@@ -217,10 +217,8 @@ def list_today_sorted(tz: str) -> List[Dict]:
                 if due_date <= today:  # Include overdue tasks
                     today_tasks.append(task)
             else:
-                # Tasks without due date are considered for today
-                created_date = parse_date(task["createdAt"]).date()
-                if created_date == today:
-                    today_tasks.append(task)
+                # Tasks without due date are always shown (until completed)
+                today_tasks.append(task)
     
     # Add expanded recurring tasks
     today_tasks.extend(expand_for_today(tz))

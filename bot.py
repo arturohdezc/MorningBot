@@ -427,8 +427,9 @@ async def cmd_ia(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             instruction = args.get("preference_instruction", "")
             if instruction:
                 try:
-                    update_prefs_from_instruction(instruction)
-                    await update.message.reply_text("✅ Preferencias actualizadas")
+                    updated_prefs = await update_prefs_from_instruction(instruction)
+                    explanation = updated_prefs.get('_ai_explanation', 'Preferencias actualizadas')
+                    await update.message.reply_text(f"✅ Preferencias actualizadas\n\n{explanation}")
                 except Exception as e:
                     await update.message.reply_text(
                         "❌ Error al actualizar preferencias"
@@ -470,11 +471,17 @@ async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         brief_message += f"\n⚡ Brief desde caché (actualizado hace {int((datetime.now() - progress.last_updated).total_seconds() / 60)} min)"
         
+        # Add regenerate button to cached brief too
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        keyboard = [[InlineKeyboardButton("🔄 Regenerar Brief", callback_data="regenerate_brief")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         await send_paginated_message(
             bot=context.bot,
             chat_id=update.effective_chat.id,
             content=brief_message,
             parse_mode="Markdown",
+            reply_markup=reply_markup
         )
         return
     
