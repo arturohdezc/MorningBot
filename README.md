@@ -21,20 +21,24 @@ Un bot de Telegram que proporciona un brief matutino personalizado y gestiona ta
 - **Sincronización opcional**: Con Google Tasks
 - **Prioridades**: high/medium/low con ordenamiento automático
 
-### Router de IA Multi-Proveedor (12 Modelos Disponibles)
+### Router de IA Multi-Proveedor (9 Modelos Disponibles)
 
-- **Gemini**: 4 modelos incluyendo 2.0 Flash Experimental
-- **OpenRouter**: 8 modelos GRATUITOS (Llama 3.2, Phi-3, Gemma 2, etc.)
+- **Gemini**: 3 modelos incluyendo 2.0 Flash Experimental
+- **OpenRouter**: 6 modelos GRATUITOS (GPT OSS 20B, GLM 4.5 Air, Qwen3, etc.)
 - **Configuración Dinámica**: Cambio de modelo desde Telegram
+- **Preferencias con IA**: Interpreta lenguaje natural para filtros de email
 - **Fallbacks robustos**: Heurística local cuando falla cualquier proveedor de IA
 - **Intents soportados**: add, recur, listar, completar, ajustar_prefs, brief
 
 ### Interfaz Interactiva Avanzada
 
 - **Teclado principal**: Botones de acceso rápido
-- **Configuración de IA**: 12 modelos disponibles, cambio desde Telegram
-- **Brief Progresivo**: Muestra avance en tiempo real con contenido parcial
+- **Configuración de IA**: 9 modelos disponibles, cambio desde Telegram
+- **Brief Progresivo**: Muestra avance limpio (solo status, sin contenido verboso)
+- **Botón Regenerar**: Regenera brief desde brief completo o ajustes de preferencias
 - **Emails Mejorados**: Formato estructurado con razón de importancia
+- **IDs Human-Friendly**: Tareas con IDs simples (T001, T002, T003)
+- **Preferencias IA**: Interpreta instrucciones naturales ("no me des correos de oracle")
 - **Botones contextuales**: Acciones inline para tareas
 - **Paginación universal**: Mensajes largos divididos automáticamente
 
@@ -63,8 +67,13 @@ Un bot de Telegram que proporciona un brief matutino personalizado y gestiona ta
 
 ```
 /add necesito llamar al dentista mañana 3pm prioridad alta
-/add comprar leche
+Bot: ✅ Tarea creada: T001
+
+/add comprar leche  
+Bot: ✅ Tarea creada: T002
+
 /add revisar informe el viernes 10am prioridad media
+Bot: ✅ Tarea creada: T003
 ```
 
 ### Tareas Recurrentes
@@ -89,8 +98,14 @@ Un bot de Telegram que proporciona un brief matutino personalizado y gestiona ta
 
 ```
 /ajusta ya no me des correos de oracle
-/ajusta bloquear newsletters y promociones
-/ajusta priorizar correos de mi jefe
+Bot: ✅ Preferencias actualizadas
+     Cambios: Bloqueado emails que contengan 'oracle'
+     [🔄 Regenerar Brief con Nuevos Filtros]
+
+/ajusta priorizar correos de mi jefe juan@empresa.com
+Bot: ✅ Preferencias actualizadas  
+     Cambios: Priorizados emails de juan@empresa.com
+     [🔄 Regenerar Brief con Nuevos Filtros]
 ```
 
 ## 🛠 Configuración
@@ -171,9 +186,8 @@ GEMINI_API_KEY=tu_api_key_de_gemini
 
 **Modelos Gemini disponibles:**
 - `gemini-1.5-flash` - Rápido y eficiente (por defecto)
-- `gemini-1.5-pro` - Más potente y preciso
-- `gemini-2.0-flash-exp` - Última versión experimental
-- `gemini-exp-1206` - Versión experimental diciembre
+- `gemini-2.0-flash-exp` - Versión 2.0 rápida
+- `gemini-2.0-flash-thinking-exp` - Versión 2.0 experimental
 
 #### Opción 2: Usar OpenRouter (Solo Modelos Gratuitos)
 
@@ -184,14 +198,12 @@ OPENROUTER_MODEL=meta-llama/llama-3.2-3b-instruct:free
 ```
 
 **Modelos GRATUITOS soportados en OpenRouter:**
-- `meta-llama/llama-3.2-3b-instruct:free` - Llama 3.2 3B
-- `meta-llama/llama-3.2-1b-instruct:free` - Llama 3.2 1B  
-- `microsoft/phi-3-mini-128k-instruct:free` - Phi-3 Mini
-- `microsoft/phi-3-medium-128k-instruct:free` - Phi-3 Medium
-- `google/gemma-2-9b-it:free` - Gemma 2 9B
-- `huggingface/zephyr-7b-beta:free` - Zephyr 7B
-- `openchat/openchat-7b:free` - OpenChat 7B
-- `gryphe/mythomist-7b:free` - Mythomist 7B
+- `openai/gpt-oss-20b:free` - GPT OSS 20B
+- `zhipuai/glm-4.5-air:free` - GLM 4.5 Air (Z.AI)
+- `qwen/qwen-3-coder:free` - Qwen3 Coder
+- `moonshot/kimi-k2:free` - Kimi K2 (MoonshotAI)
+- `deepseek/r1-0528:free` - DeepSeek R1 0528
+- `google/gemma-3n-2b:free` - Gemma 3n 2B
 
 4. **Configurar Google APIs**
 
