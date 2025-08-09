@@ -154,7 +154,7 @@ async def fetch_single_feed(url: str) -> List[Dict]:
         loop = asyncio.get_event_loop()
         feed = await asyncio.wait_for(
             loop.run_in_executor(None, feedparser.parse, url),
-            timeout=10.0  # 10 second timeout per feed
+            timeout=5.0  # 5 second timeout per feed
         )
         
         # Check if feed was parsed successfully

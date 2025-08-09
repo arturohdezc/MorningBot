@@ -403,7 +403,7 @@ async def generate_brief_background(update: Update, context: ContextTypes.DEFAUL
         # Try each operation individually with error handling
         try:
             logger.info("📰 Fetching news...")
-            news_data = await asyncio.wait_for(fetch_and_summarize_news(), timeout=5.0)
+            news_data = await asyncio.wait_for(fetch_and_summarize_news(), timeout=15.0)
             logger.info("✅ News fetched successfully")
         except Exception as e:
             import traceback
@@ -412,7 +412,7 @@ async def generate_brief_background(update: Update, context: ContextTypes.DEFAUL
         
         try:
             logger.info("📧 Fetching emails...")
-            emails_data = await asyncio.wait_for(fetch_and_rank_emails(), timeout=8.0)
+            emails_data = await asyncio.wait_for(fetch_and_rank_emails(), timeout=15.0)
             logger.info("✅ Emails fetched successfully")
         except Exception as e:
             import traceback
