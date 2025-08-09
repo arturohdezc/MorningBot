@@ -14,13 +14,22 @@ from googleapiclient.discovery import build
 import base64
 
 # Target accounts to read from - Configure via environment variable
-TARGET_ACCOUNTS = [
-    "user1@example.com",
-    "user2@example.com", 
-    "user3@example.com",
-    "user4@example.com",
-    "user5@example.com",
-]
+def get_target_accounts():
+    """Get target accounts from environment variable"""
+    accounts_env = os.getenv('TARGET_GMAIL_ACCOUNTS', '')
+    if accounts_env:
+        return [email.strip() for email in accounts_env.split(',') if email.strip()]
+    else:
+        # Fallback for development
+        return [
+            "user1@example.com",
+            "user2@example.com", 
+            "user3@example.com",
+            "user4@example.com",
+            "user5@example.com",
+        ]
+
+TARGET_ACCOUNTS = get_target_accounts()
 
 
 def load_account_credentials() -> Dict[str, Credentials]:
