@@ -371,7 +371,8 @@ async def generate_brief():
 ### Límite de Tiempo y Timeout de Telegram
 - **Respuesta inmediata**: Bot responde en <2 segundos para evitar timeout de Telegram
 - **Procesamiento en background**: Brief se genera en background con timeout de 20 segundos
-- **Timeouts individuales**: Cada operación tiene timeout específico
+- **Timeouts optimizados para Render**: 15s para noticias/emails, 5s por RSS feed, 12s para Gmail
+- **Carga de tokens desde entorno**: MULTI_ACCOUNT_TOKENS_BASE64 para deployment en Render
 - **Resultados parciales**: Si una operación falla, continuar con las demás
 
 ## Security Considerations
